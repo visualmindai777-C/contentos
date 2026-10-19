@@ -1,6 +1,6 @@
 FROM python:3.12-slim
 
-# HuggingFace Spaces exige uid 1000 y puerto 7860.
+# Usuario no root; Render envía el tráfico al puerto 7860 (variable PORT del servicio).
 # La API es ligera: FFmpeg, Kokoro y torch viven solo en el workflow de GitHub Actions.
 RUN useradd -m -u 1000 user
 USER user

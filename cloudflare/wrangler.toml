@@ -5,17 +5,17 @@ compatibility_date = "2026-09-01"
 [observability]
 enabled = true
 
-# 1) cada 15 min: ¿hay contenidos en cola? → lanza el pipeline solo si los hay (y mantiene despiertos HF y Supabase)
+# 1) cada 10 min: ¿hay contenidos en cola? → lanza el pipeline solo si los hay (y mantiene despiertos Render y Supabase)
 # 2) cada 8 h: contenido nuevo a partir de tendencias. Mantener este cron igual que FRESH_CRON en src/index.ts
 [triggers]
-crons = ["*/15 * * * *", "17 */8 * * *"]
+crons = ["*/10 * * * *", "17 */8 * * *"]
 
 [[r2_buckets]]
 binding = "ARTIFACTS"
 bucket_name = "contentos"
 
 [vars]
-BACKEND_URL = "https://USUARIO-SPACE.hf.space" # sin barra final
+BACKEND_URL = "https://CONTENTOS-API.onrender.com" # sin barra final
 GITHUB_REPO = "usuario/repositorio"
 GITHUB_REF = "main"
 FRESH_LIMIT = "3"

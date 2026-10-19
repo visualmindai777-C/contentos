@@ -1,5 +1,5 @@
-# Despliega todo desde GitHub: API en HuggingFace Spaces, Worker y portal en Cloudflare. Tú solo cargas los secrets
-# de abajo una vez; el workflow calcula las URLs, crea el Space, reparte los secretos a cada servicio y espera a que
+# Despliega todo desde GitHub: API en Render (free), Worker y portal en Cloudflare. Tú solo cargas los secrets
+# de abajo una vez; el workflow calcula las URLs, crea el servicio de Render, reparte los secretos a cada servicio y espera a que
 # la API responda.
 #
 # Interruptor: variable DEPLOY_ENABLED=true (sin ella el workflow no hace nada).
@@ -7,9 +7,9 @@
 # Secrets de GitHub:
 #   CLOUDFLARE_API_TOKEN   permisos de cuenta: Workers Scripts (Edit), Workers R2 Storage (Edit), Account Settings (Read)
 #   CLOUDFLARE_ACCOUNT_ID
-#   HF_TOKEN               token de Hugging Face con permiso de escritura
+#   RENDER_API_KEY         clave de API de Render (Account Settings > API Keys)
 #   WORKER_GITHUB_TOKEN    token fine-grained de GitHub con "Actions: Read and write" sobre este repositorio
-#   DATABASE_URL           (ya cargado: lo usa también la API en el Space)
+#   DATABASE_URL           (ya cargado: lo usa también la API en Render)
 #   API_KEY                clave compartida API ↔ portal ↔ Worker
 #   ARTIFACT_SECRET        firma de las URLs de descarga (API ↔ Worker)
 #   PORTAL_PASSWORD        contraseña de acceso al portal (usuario: admin)
@@ -29,7 +29,7 @@ permissions:
   contents: read
 
 env:
-  SPACE_NAME: contentos-api
+  SERVICE_NAME: contentos-api
   WORKER_NAME: contentos-worker
 
 jobs:
@@ -63,40 +63,78 @@ jobs:
           done
           echo "any=$any" >> "$GITHUB_OUTPUT"
 
-  # Las URLs de unos servicios las necesitan los otros (la API firma enlaces del Worker, el portal llama a la API...)
-  urls:
+  # La URL de la API la fija Render al crear el servicio, así que esta etapa lo crea (o lo encuentra) y la publica:
+  # el Worker y el portal la necesitan para desplegarse. Si backend/ cambió, además lanza un deploy.
+  api:
     needs: changes
     if: needs.changes.outputs.any == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
     outputs:
-      hf_user: ${{ steps.u.outputs.hf_user }}
-      backend_url: ${{ steps.u.outputs.backend_url }}
-      worker_url: ${{ steps.u.outputs.worker_url }}
+      backend_url: ${{ steps.svc.outputs.backend_url }}
+      worker_url: ${{ steps.urls.outputs.worker_url }}
+    env:
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CF_SUBDOMAIN: ${{ vars.CF_SUBDOMAIN }}
     steps:
-      - id: u
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CF_SUBDOMAIN: ${{ vars.CF_SUBDOMAIN }}
+      - id: urls
         run: |
-          : "${HF_TOKEN:?Falta el secret HF_TOKEN}" "${CF_TOKEN:?Falta el secret CLOUDFLARE_API_TOKEN}" "${CF_ACCOUNT:?Falta CLOUDFLARE_ACCOUNT_ID}"
-          hf_user=$(curl -fsS -H "Authorization: Bearer $HF_TOKEN" https://huggingface.co/api/whoami-v2 | jq -r '.name // empty')
-          [ -n "$hf_user" ] || { echo "::error::HF_TOKEN no es válido: no se pudo leer el usuario de Hugging Face"; exit 1; }
-          # Los Spaces se sirven en https://<usuario>-<space>.hf.space (minúsculas, '_' → '-')
-          host=$(echo "${hf_user}-${SPACE_NAME}" | tr 'A-Z_' 'a-z-')
+          : "${RENDER_API_KEY:?Falta el secret RENDER_API_KEY}" "${CF_TOKEN:?Falta el secret CLOUDFLARE_API_TOKEN}" "${CF_ACCOUNT:?Falta CLOUDFLARE_ACCOUNT_ID}"
           sub="${CF_SUBDOMAIN:-}"
           [ -n "$sub" ] || sub=$(curl -fsS -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/subdomain" | jq -r '.result.subdomain // empty' || true)
-          [ -n "$sub" ] || { echo "::error::Tu cuenta de Cloudflare no tiene subdominio workers.dev. Créalo en Workers & Pages (te lo pide al abrir la sección) o revisa los permisos del token (Account Settings: Read)."; exit 1; }
-          {
-            echo "hf_user=$hf_user"
-            echo "backend_url=https://${host}.hf.space"
-            echo "worker_url=https://${WORKER_NAME}.${sub}.workers.dev"
-          } >> "$GITHUB_OUTPUT"
+          [ -n "$sub" ] || { echo "::error::Falta el subdominio workers.dev: define la variable CF_SUBDOMAIN"; exit 1; }
+          echo "worker_url=https://${WORKER_NAME}.${sub}.workers.dev" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+
+      - name: Crear el servicio de Render si no existe
+        id: svc
+        run: |
+          render() { curl -fsS -H "Authorization: Bearer $RENDER_API_KEY" -H "Content-Type: application/json" "$@"; }
+          id=$(render "https://api.render.com/v1/services?name=${SERVICE_NAME}&limit=20" | jq -r --arg n "$SERVICE_NAME" '[.[].service | select(.name==$n)][0].id // empty')
+          if [ -z "$id" ]; then
+            owner=$(render "https://api.render.com/v1/owners?limit=1" | jq -r '.[0].owner.id')
+            body=$(jq -n --arg n "$SERVICE_NAME" --arg o "$owner" --arg r "https://github.com/${GITHUB_REPOSITORY}" '{
+              type:"web_service", name:$n, ownerId:$o, repo:$r, branch:"main", rootDir:"backend", autoDeploy:"no",
+              serviceDetails:{runtime:"docker", plan:"free", region:"oregon", healthCheckPath:"/health",
+                envSpecificDetails:{dockerfilePath:"./Dockerfile", dockerContext:"."}}}')
+            id=$(render -X POST https://api.render.com/v1/services -d "$body" | jq -r '.service.id')
+            echo "Servicio creado: $id"
+          fi
+          url=$(render "https://api.render.com/v1/services/$id" | jq -r '.serviceDetails.url')
+          { echo "id=$id"; echo "backend_url=$url"; } >> "$GITHUB_OUTPUT"
+          echo "API: $url"
+
+      - name: Variables de entorno de la API
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          API_KEY: ${{ secrets.API_KEY }}
+          ARTIFACT_SECRET: ${{ secrets.ARTIFACT_SECRET }}
+          WORKER_URL: ${{ steps.urls.outputs.worker_url }}
+          SERVICE_ID: ${{ steps.svc.outputs.id }}
+        run: |
+          : "${DATABASE_URL:?Falta DATABASE_URL}" "${API_KEY:?Falta API_KEY}" "${ARTIFACT_SECRET:?Falta ARTIFACT_SECRET}"
+          jq -n --arg d "$DATABASE_URL" --arg a "$API_KEY" --arg s "$ARTIFACT_SECRET" --arg w "${WORKER_URL}/artifacts"             '[{key:"DATABASE_URL",value:$d},{key:"API_KEY",value:$a},{key:"ARTIFACT_SECRET",value:$s},{key:"ASSETS_BASE_URL",value:$w},{key:"PORT",value:"7860"}]' |
+          curl -fsS -X PUT "https://api.render.com/v1/services/${SERVICE_ID}/env-vars"             -H "Authorization: Bearer $RENDER_API_KEY" -H "Content-Type: application/json" -d @- > /dev/null
+          echo "variables cargadas"
+
+      - name: Desplegar y esperar a que la API responda
+        env:
+          SERVICE_ID: ${{ steps.svc.outputs.id }}
+          BACKEND_URL: ${{ steps.svc.outputs.backend_url }}
+        run: |
+          curl -fsS -X POST "https://api.render.com/v1/services/${SERVICE_ID}/deploys"             -H "Authorization: Bearer $RENDER_API_KEY" -H "Content-Type: application/json" -d '{}' > /dev/null
+          for _ in $(seq 1 150); do
+            if curl -fsS -m 15 "${BACKEND_URL}/health" | grep -q '"ok"'; then echo "API activa: ${BACKEND_URL}"; exit 0; fi
+            sleep 10
+          done
+          echo "::error::La API no respondió en 25 minutos. Revisa el deploy en https://dashboard.render.com"
+          exit 1
 
   worker:
-    needs: [changes, urls]
+    needs: [changes, api]
     if: needs.changes.outputs.worker == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -115,9 +153,9 @@ jobs:
           cache-dependency-path: cloudflare/package-lock.json
       - name: Configurar URLs
         env:
-          BACKEND_URL: ${{ needs.urls.outputs.backend_url }}
+          BACKEND_URL: ${{ needs.api.outputs.backend_url }}
         run: |
-          sed -i "s|https://USUARIO-SPACE.hf.space|${BACKEND_URL}|; s|usuario/repositorio|${GITHUB_REPOSITORY}|" wrangler.toml
+          sed -i "s|https://CONTENTOS-API.onrender.com|${BACKEND_URL}|; s|usuario/repositorio|${GITHUB_REPOSITORY}|" wrangler.toml
           grep -E '^(BACKEND_URL|GITHUB_REPO)' wrangler.toml
       - run: npm ci
       - run: npm test && npm run typecheck
@@ -135,7 +173,7 @@ jobs:
           rm -f "$RUNNER_TEMP/worker-secrets.json"
 
   portal:
-    needs: [changes, urls]
+    needs: [changes, api]
     if: needs.changes.outputs.portal == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -154,10 +192,10 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Configurar URLs
         env:
-          BACKEND_URL: ${{ needs.urls.outputs.backend_url }}
-          WORKER_URL: ${{ needs.urls.outputs.worker_url }}
+          BACKEND_URL: ${{ needs.api.outputs.backend_url }}
+          WORKER_URL: ${{ needs.api.outputs.worker_url }}
         run: |
-          sed -i "s|https://USUARIO-SPACE.hf.space|${BACKEND_URL}|; s|https://contentos-worker.CUENTA.workers.dev|${WORKER_URL}|" wrangler.jsonc
+          sed -i "s|https://CONTENTOS-API.onrender.com|${BACKEND_URL}|; s|https://contentos-worker.CUENTA.workers.dev|${WORKER_URL}|" wrangler.jsonc
           grep -E 'BACKEND_URL|WORKER_URL' wrangler.jsonc
       - run: npm ci
       - run: npm test
@@ -171,65 +209,3 @@ jobs:
           jq -n --arg a "$API_KEY" --arg p "$PORTAL_PASSWORD" '{API_KEY:$a, PORTAL_USER:"admin", PORTAL_PASSWORD:$p}' > "$RUNNER_TEMP/portal-secrets.json"
           npx wrangler secret bulk "$RUNNER_TEMP/portal-secrets.json"
           rm -f "$RUNNER_TEMP/portal-secrets.json"
-
-  space:
-    needs: [changes, urls]
-    if: needs.changes.outputs.space == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    env:
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
-      HF_USER: ${{ needs.urls.outputs.hf_user }}
-      BACKEND_URL: ${{ needs.urls.outputs.backend_url }}
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Crear el Space si no existe
-        run: |
-          code=$(curl -sS -o "$RUNNER_TEMP/create.json" -w "%{http_code}" -X POST https://huggingface.co/api/repos/create \
-            -H "Authorization: Bearer $HF_TOKEN" -H "Content-Type: application/json" \
-            -d "{\"type\":\"space\",\"name\":\"${SPACE_NAME}\",\"sdk\":\"docker\",\"private\":false}")
-          case "$code" in
-            200|201) echo "Space creado" ;;
-            409) echo "El Space ya existe" ;;
-            *) echo "::error::No se pudo crear el Space (HTTP $code): $(head -c 300 "$RUNNER_TEMP/create.json")"; exit 1 ;;
-          esac
-
-      # Los secretos van antes del código: el primer build ya los encuentra
-      - name: Secretos del Space
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          API_KEY: ${{ secrets.API_KEY }}
-          ARTIFACT_SECRET: ${{ secrets.ARTIFACT_SECRET }}
-          WORKER_URL: ${{ needs.urls.outputs.worker_url }}
-        run: |
-          : "${DATABASE_URL:?Falta DATABASE_URL}" "${API_KEY:?Falta API_KEY}" "${ARTIFACT_SECRET:?Falta ARTIFACT_SECRET}"
-          set_secret() {
-            curl -fsS -X POST "https://huggingface.co/api/spaces/${HF_USER}/${SPACE_NAME}/secrets" \
-              -H "Authorization: Bearer $HF_TOKEN" -H "Content-Type: application/json" \
-              -d "$(jq -n --arg k "$1" --arg v "$2" '{key:$k, value:$v}')" > /dev/null && echo "secret $1 cargado"
-          }
-          set_secret DATABASE_URL "$DATABASE_URL"
-          set_secret API_KEY "$API_KEY"
-          set_secret ARTIFACT_SECRET "$ARTIFACT_SECRET"
-          set_secret ASSETS_BASE_URL "${WORKER_URL}/artifacts"
-
-      # El Space es un repo git propio cuya raíz es backend/ (Dockerfile + README.md con el front-matter del Space)
-      - name: Sincronizar backend/ con el Space
-        run: |
-          git clone --depth 1 "https://${HF_USER}:${HF_TOKEN}@huggingface.co/spaces/${HF_USER}/${SPACE_NAME}" space
-          rsync -a --delete --exclude .git --exclude tests --exclude scripts --exclude __pycache__ backend/ space/
-          cd space
-          git config user.name github-actions
-          git config user.email actions@users.noreply.github.com
-          git add -A
-          if git diff --cached --quiet; then echo "Sin cambios"; else git commit -m "Sync desde ${GITHUB_SHA}" && git push; fi
-
-      - name: Esperar a que la API responda
-        run: |
-          for _ in $(seq 1 90); do
-            if curl -fsS -m 10 "${BACKEND_URL}/health" | grep -q '"ok"'; then echo "API activa: ${BACKEND_URL}"; exit 0; fi
-            sleep 10
-          done
-          echo "::error::La API no respondió en 15 minutos. Revisa el build del Space: https://huggingface.co/spaces/${HF_USER}/${SPACE_NAME}"
-          exit 1

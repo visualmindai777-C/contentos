@@ -7,7 +7,7 @@
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "observability": { "enabled": true },
   "vars": {
-    "BACKEND_URL": "https://USUARIO-SPACE.hf.space",
+    "BACKEND_URL": "https://CONTENTOS-API.onrender.com",
     "WORKER_URL": "https://contentos-worker.CUENTA.workers.dev"
   }
   // Secrets: API_KEY (la misma del backend), PORTAL_USER y PORTAL_PASSWORD (acceso al portal)

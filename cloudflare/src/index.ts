@@ -13,14 +13,14 @@ const FRESH_CRON = "17 */8 * * *"; // igual que el segundo cron de wrangler.toml
 async function pendingInQueue(env: Env): Promise<number> {
   const res = await fetch(`${env.BACKEND_URL}/pipeline/queue`, {
     headers: { "x-api-key": env.API_KEY },
-    signal: AbortSignal.timeout(90_000), // un Space dormido tarda en despertar
+    signal: AbortSignal.timeout(90_000), // una API dormida (Render free) tarda en despertar
   });
   if (!res.ok) throw new Error(`backend /pipeline/queue: HTTP ${res.status}`);
   return ((await res.json()) as { data: { pending: number } }).data.pending;
 }
 
 async function tick(env: Env, trigger: Trigger): Promise<void> {
-  // Consultar la cola no gasta Actions y, de paso, mantiene despiertos HF y Supabase.
+  // Consultar la cola no gasta Actions y, de paso, mantiene despiertos Render y Supabase.
   const pending = trigger === "queue" ? await pendingInQueue(env) : 0;
   if (trigger === "queue" && pending === 0) return console.log(JSON.stringify({ trigger, pending, dispatch: false, reason: "cola vacía" }));
 

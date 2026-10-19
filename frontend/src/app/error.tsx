@@ -10,7 +10,7 @@ export default function ErrorPage({ reset }: { error: Error; reset: () => void }
     <div className="space-y-3">
       <h1 className="text-lg font-semibold">No se pudo cargar la página</h1>
       <p className="text-sm text-muted-foreground">
-        El backend puede estar dormido (HuggingFace) o caído. Reintenta en unos segundos.
+        El backend puede estar dormido (Render free) o caído. Reintenta en unos segundos.
       </p>
       <Button
         onClick={() =>
