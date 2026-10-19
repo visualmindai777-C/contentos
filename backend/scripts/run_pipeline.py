@@ -7,6 +7,8 @@ import os
 import sys
 import time
 
+from sqlalchemy import make_url, text
+
 from app.agents.runner import BatchResult, run_batch
 from app.container import build_agents, build_providers
 from app.core.database import SessionLocal, engine
@@ -41,6 +43,22 @@ async def drop_dead_models(settings: Settings) -> Settings:
     return settings.model_copy(update={"openrouter_models": ",".join(alive)})
 
 
+async def database_problem() -> str | None:
+    """Comprueba la conexión antes de gastar nada. Nunca muestra la contraseña, solo a dónde y como quién se intenta entrar."""
+    url = make_url(get_settings().database_url)
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("select 1"))
+    except Exception as e:
+        detail = str(e).strip().splitlines()[0][:200] if str(e).strip() else type(e).__name__
+        return (
+            f"No se pudo conectar a la base de datos (usuario={url.username}, host={url.host}, puerto={url.port}, "
+            f"base={url.database}). Con el pooler de Supabase el usuario debe ser postgres.<ref-del-proyecto> y la "
+            f"contraseña la del proyecto. Detalle: {detail}"
+        )
+    return None
+
+
 async def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int, default=3, help="contenidos por ejecución")
@@ -50,6 +68,10 @@ async def main() -> int:
 
     settings = get_settings()
     setup_logging(settings.log_level)
+    if problem := await database_problem():
+        print(f"::error::{problem}", file=sys.stderr)
+        await engine.dispose()
+        return 2
     settings = await drop_dead_models(settings)
     if not settings.openrouter_model_list:
         print("::error::Ninguno de los modelos de OPENROUTER_MODELS existe ya en OpenRouter", file=sys.stderr)
