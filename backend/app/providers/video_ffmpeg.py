@@ -1,0 +1,84 @@
+import asyncio
+import shutil
+from pathlib import Path
+
+from app.core.interfaces import ProviderError
+from app.core.subtitles import chunk_segments, to_srt
+from app.core.types import RenderedVideo, VideoSpec
+
+SUBTITLE_STYLE = (
+    "FontName=DejaVu Sans,FontSize=14,Bold=1,Alignment=2,MarginV=60,Outline=3,Shadow=0,"
+    "PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000"
+)
+ZOOM_OVERSCAN = 1.5  # las imágenes se amplían antes del zoom suave para que no se vea el pixelado
+
+
+class FFmpegVideo:
+    """Imágenes con zoom suave + narración + subtítulos quemados, todo en una sola pasada de FFmpeg.
+
+    CRF alto y preset rápido: prioriza minutos de GitHub Actions y espacio en R2 sobre calidad.
+    """
+
+    def __init__(self, preset: str = "veryfast", crf: int = 28):
+        self._preset = preset
+        self._crf = crf
+
+    async def render(self, spec: VideoSpec) -> RenderedVideo:
+        if not spec.images:
+            raise ProviderError("ffmpeg: no hay imágenes")
+        for tool in ("ffmpeg", "ffprobe"):
+            if not shutil.which(tool):
+                raise ProviderError(f"{tool} no está instalado")
+
+        output = spec.output.resolve()
+        output.parent.mkdir(parents=True, exist_ok=True)
+        srt = output.with_suffix(".srt")
+        srt.write_text(to_srt(chunk_segments(spec.segments)), encoding="utf-8")
+
+        audio = spec.audio.resolve()
+        duration = await self._duration(audio)
+        n = len(spec.images)
+        frames = max(1, round(duration / n * spec.fps))
+        w, h = spec.width, spec.height
+        bw, bh = int(w * ZOOM_OVERSCAN), int(h * ZOOM_OVERSCAN)
+
+        clips = [
+            f"[{i}:v]scale={bw}:{bh}:force_original_aspect_ratio=increase,crop={bw}:{bh},"
+            f"zoompan=z='min(zoom+0.0007,1.15)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+            f":d={frames}:s={w}x{h}:fps={spec.fps},setsar=1[v{i}]"
+            for i in range(n)
+        ]
+        joined = "".join(f"[v{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=0[cat]"
+        subs = f"[cat]subtitles={srt.name}:force_style='{SUBTITLE_STYLE}'[out]"
+
+        cmd = ["ffmpeg", "-y", "-loglevel", "error"]
+        for image in spec.images:
+            cmd += ["-i", str(image.resolve())]
+        cmd += [
+            "-i", str(audio), "-filter_complex", ";".join([*clips, joined, subs]),
+            "-map", "[out]", "-map", f"{n}:a", "-t", f"{duration:.2f}",
+            "-c:v", "libx264", "-preset", self._preset, "-crf", str(self._crf), "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(output),
+        ]
+        await self._run(cmd, cwd=output.parent)  # cwd = carpeta del .srt: evita escapar rutas en el filtro
+
+        return RenderedVideo(path=output, duration=await self._duration(output), file_size=output.stat().st_size)
+
+    async def _duration(self, path: Path) -> float:
+        out = await self._run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)]
+        )
+        try:
+            return float(out.strip())
+        except ValueError as e:
+            raise ProviderError(f"ffprobe: duración ilegible en {path.name}") from e
+
+    @staticmethod
+    async def _run(cmd: list[str], cwd: Path | None = None) -> str:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, cwd=cwd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode:
+            raise ProviderError(f"{cmd[0]} falló: {stderr.decode(errors='replace')[-600:]}")
+        return stdout.decode()

@@ -1,0 +1,79 @@
+# Genera contenido: tendencias → guion → voz/imágenes/vídeo → R2 + PostgreSQL.
+#
+# NO tiene cron propio: lo lanza el Worker de Cloudflare (cloudflare/src/index.ts) con workflow_dispatch, solo cuando
+# hay contenidos en cola o toca generar contenido nuevo. Así no se gastan minutos consultando una cola vacía.
+# Manualmente: "Run workflow" (por defecto solo la cola; desmarca queue_only para crear contenido nuevo).
+#
+# Secrets: DATABASE_URL (cadena del POOLER de Supabase, puerto 6543: los runners no tienen IPv6),
+#          OPENROUTER_API_KEY, R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, POLLINATIONS_TOKEN (opcional)
+# Variables (opcionales): R2_BUCKET, OPENROUTER_MODELS, TTS_VOICE, TTS_LANG
+name: pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: Contenidos a procesar
+        default: "3"
+      queue_only:
+        description: Solo la cola (regeneraciones e ideas manuales); no crear contenido nuevo
+        type: boolean
+        default: true
+
+# Una sola ejecución a la vez: el pipeline no reserva contenidos, dos ejecuciones procesarían los mismos.
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      - name: Paquetes del sistema
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg espeak-ng libsndfile1 fonts-dejavu-core
+
+      - name: Dependencias
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install ".[pipeline]"
+
+      # El modelo de Kokoro (~330 MB) tarda ~2 min en descargarse: se cachea entre ejecuciones.
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/huggingface
+          key: kokoro-82m-v1
+
+      - name: Pipeline
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODELS: ${{ vars.OPENROUTER_MODELS }}
+          POLLINATIONS_TOKEN: ${{ secrets.POLLINATIONS_TOKEN }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+          TTS_VOICE: ${{ vars.TTS_VOICE }}
+          TTS_LANG: ${{ vars.TTS_LANG }}
+          LIMIT: ${{ inputs.limit }}
+          QUEUE_ONLY: ${{ inputs.queue_only }}
+        run: |
+          flags=()
+          [ "$QUEUE_ONLY" = "true" ] && flags+=(--queue-only)
+          python scripts/run_pipeline.py --limit "$LIMIT" --max-minutes 60 "${flags[@]}"

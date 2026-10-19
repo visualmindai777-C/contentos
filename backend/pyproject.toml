@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "contentos-backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "sqlalchemy[asyncio]>=2.0.30",
+  "asyncpg>=0.29",
+  "pydantic>=2.7",
+  "pydantic-settings>=2.3",
+]
+
+[project.optional-dependencies]
+# Solo el workflow de GitHub Actions las instala (torch CPU va aparte). La API no las necesita.
+pipeline = ["httpx>=0.27", "boto3>=1.34", "kokoro>=0.9.4", "soundfile>=0.12", "numpy", "langgraph>=0.6"]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]

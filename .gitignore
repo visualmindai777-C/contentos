@@ -1,0 +1,12 @@
+.env
+.env.local
+next-env.d.ts
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+.next/
+.open-next/
+.wrangler/
+*.egg-info/
+.dev.vars

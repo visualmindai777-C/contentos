@@ -1,0 +1,106 @@
+# Despliega solo lo que cambió: Worker (cloudflare/), portal (frontend/) y API en HuggingFace Spaces (backend/).
+#
+# Secrets: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, HF_TOKEN (permiso de escritura)
+# Variable: HF_SPACE (usuario/space). Los secrets de ejecución de cada servicio se cargan UNA vez en su plataforma
+# (wrangler secret put / ajustes del Space) y persisten entre despliegues.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+    paths: ["cloudflare/**", "frontend/**", "backend/**", ".github/workflows/deploy.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      worker: ${{ steps.diff.outputs.worker }}
+      portal: ${{ steps.diff.outputs.portal }}
+      space: ${{ steps.diff.outputs.space }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - id: diff
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            files=$(printf 'cloudflare/\nfrontend/\nbackend/\n')
+          else
+            files=$(git diff --name-only HEAD^ HEAD)
+          fi
+          for pair in cloudflare:worker frontend:portal backend:space; do
+            if echo "$files" | grep -q "^${pair%%:*}/"; then echo "${pair##*:}=true" >> "$GITHUB_OUTPUT"; else echo "${pair##*:}=false" >> "$GITHUB_OUTPUT"; fi
+          done
+
+  worker:
+    needs: changes
+    if: needs.changes.outputs.worker == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: cloudflare
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: cloudflare/package-lock.json
+      - run: npm ci
+      - run: npm test && npm run typecheck
+      - run: npm run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  portal:
+    needs: changes
+    if: needs.changes.outputs.portal == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run cf:deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  space:
+    needs: changes
+    if: needs.changes.outputs.space == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      # El Space es un repo git propio cuya raíz es backend/ (Dockerfile + README.md con el front-matter del Space).
+      - name: Sincronizar backend/ con el Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        run: |
+          : "${HF_SPACE:?Define la variable HF_SPACE (usuario/space)}"
+          git clone --depth 1 "https://${HF_SPACE%%/*}:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}" space
+          rsync -a --delete --exclude .git --exclude tests --exclude scripts --exclude __pycache__ backend/ space/
+          cd space
+          git config user.name github-actions
+          git config user.email actions@users.noreply.github.com
+          git add -A
+          if git diff --cached --quiet; then echo "Sin cambios"; else git commit -m "Sync desde ${GITHUB_SHA}" && git push; fi

@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "contentos-portal",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "observability": { "enabled": true },
+  "vars": {
+    "BACKEND_URL": "https://USUARIO-SPACE.hf.space",
+    "WORKER_URL": "https://contentos-worker.CUENTA.workers.dev"
+  }
+  // Secret (wrangler secret put API_KEY): la misma clave que el backend
+}

@@ -1,0 +1,48 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "7860:7860"
+    env_file: .env
+    environment:
+      # Desarrollo local: Postgres y Redis propios para no gastar cuota de Supabase/Upstash.
+      # Para usar Supabase, borra estas dos líneas y define DATABASE_URL/REDIS_URL en .env.
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/contentos
+      REDIS_URL: redis://redis:6379/0
+    command: uvicorn app.main:app --host 0.0.0.0 --port 7860 --reload
+    volumes:
+      - ./backend/app:/home/user/app/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:7860/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: contentos
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d contentos"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru
+
+volumes:
+  pgdata:
