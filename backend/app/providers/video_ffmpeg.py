@@ -42,8 +42,10 @@ class FFmpegVideo:
         w, h = spec.width, spec.height
         bw, bh = int(w * ZOOM_OVERSCAN), int(h * ZOOM_OVERSCAN)
 
+        # Recorte previo de la franja inferior; trunc(.../2)*2 mantiene una altura par para el códec
+        trim = f"crop=iw:trunc(ih*{1 - spec.crop_bottom:.4f}/2)*2:0:0," if spec.crop_bottom > 0 else ""
         clips = [
-            f"[{i}:v]scale={bw}:{bh}:force_original_aspect_ratio=increase,crop={bw}:{bh},"
+            f"[{i}:v]{trim}scale={bw}:{bh}:force_original_aspect_ratio=increase,crop={bw}:{bh},"
             f"zoompan=z='min(zoom+0.0007,1.15)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
             f":d={frames}:s={w}x{h}:fps={spec.fps},setsar=1[v{i}]"
             for i in range(n)

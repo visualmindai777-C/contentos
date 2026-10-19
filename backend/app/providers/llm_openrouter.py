@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Sequence
 
 import httpx
@@ -5,6 +6,8 @@ import httpx
 from app.core.interfaces import ProviderError, RateLimitError
 from app.core.types import LLMResponse, Message
 from app.providers.http_client import http_request
+
+logger = logging.getLogger("app.pipeline")
 
 URL = "https://openrouter.ai/api/v1/chat/completions"
 MODELS_URL = "https://openrouter.ai/api/v1/models"
@@ -40,6 +43,8 @@ class OpenRouterClient:
             try:
                 return await self._call(model, messages, json_mode, max_tokens)
             except ProviderError as e:
+                # Sin este rastro no se sabe por qué se cae al siguiente modelo (cuota, modelo retirado, JSON, vacío...)
+                logger.warning("openrouter model failed", extra={"fields": {"model": model, "error": str(e)[:240]}})
                 last = e
         raise last or ProviderError("openrouter: sin modelos configurados")
 

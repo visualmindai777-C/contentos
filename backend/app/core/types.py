@@ -88,6 +88,7 @@ class VideoSpec:
     width: int = 1080
     height: int = 1920
     fps: int = 30
+    crop_bottom: float = 0.0  # fracción inferior que se recorta de cada imagen (marcas de agua de proveedores gratuitos)
 
 
 @dataclass(frozen=True, slots=True)

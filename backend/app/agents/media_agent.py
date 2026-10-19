@@ -13,6 +13,7 @@ logger = logging.getLogger("app.pipeline")
 
 IMAGE_SIZE = (720, 1280)  # el vídeo sale en 1080x1920; a esta resolución Pollinations va más rápido
 MIN_IMAGES = 2
+DEFAULT_CROP_BOTTOM = 0.05  # Pollinations anónimo estampa su logo en el ~3 % inferior; nologo=true se ignora sin clave
 DEFAULT_WAIT = 45.0  # Pollinations anónimo: 1 imagen cada ~45 s por IP
 TRANSIENT_WAIT = 5.0  # timeouts y errores de red del proveedor
 MAX_WAIT = 120.0
@@ -64,9 +65,10 @@ class MediaAgent:
             path.write_bytes(image.data)
             paths.append(path)
 
-        video = await self._video.render(
-            VideoSpec(images=paths, audio=audio, segments=narration.segments, output=workdir / "video.mp4")
-        )
+        video = await self._video.render(VideoSpec(
+            images=paths, audio=audio, segments=narration.segments, output=workdir / "video.mp4",
+            crop_bottom=float(cfg.get("image_crop_bottom", DEFAULT_CROP_BOTTOM)),
+        ))
         return MediaBundle(video=video, images=paths, subtitles=to_srt(chunk_segments(narration.segments)))
 
     async def _generate_all(self, prompts: list[str]) -> list[GeneratedImage]:

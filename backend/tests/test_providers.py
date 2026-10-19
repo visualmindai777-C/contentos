@@ -47,6 +47,17 @@ def test_openrouter_falls_back_to_next_model():
     assert (r.model, r.tokens_used, r.provider, seen) == ("m2", 42, "openrouter", ["m1", "m2"])
 
 
+def test_openrouter_logs_why_each_model_failed(caplog):
+    def handler(req):
+        model = json.loads(req.content)["model"]
+        return httpx.Response(404, text="model not found") if model == "dead" else httpx.Response(200, json=completion())
+
+    with caplog.at_level("WARNING", logger="app.pipeline"):
+        run(OpenRouterClient("k", ["dead", "alive"], transport=transport(handler)).complete(MSG))
+    failed = [r for r in caplog.records if r.getMessage() == "openrouter model failed"]
+    assert len(failed) == 1 and failed[0].fields["model"] == "dead" and "404" in failed[0].fields["error"]
+
+
 def test_openrouter_all_models_rate_limited():
     client = OpenRouterClient("k", ["m1", "m2"], transport=transport(lambda r: httpx.Response(429)))
     with pytest.raises(RateLimitError):
@@ -188,7 +199,7 @@ def test_ffmpeg_renders_vertical_video(tmp_path):
     ff("-f", "lavfi", "-i", "sine=frequency=440:duration=3", str(audio))
 
     segments = [Segment("Hola mundo esto es una prueba de subtitulos largos", 0, 3)]
-    video = run(FFmpegVideo().render(VideoSpec(images, audio, segments, tmp_path / "out" / "video.mp4")))
+    video = run(FFmpegVideo().render(VideoSpec(images, audio, segments, tmp_path / "out" / "video.mp4", crop_bottom=0.05)))
     assert video.path.exists() and video.file_size > 0 and abs(video.duration - 3) < 0.3
 
 
