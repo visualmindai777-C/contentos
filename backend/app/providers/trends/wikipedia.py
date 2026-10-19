@@ -8,7 +8,8 @@ from app.providers.http_client import http_request
 from app.providers.trends import extract_keywords, log_score
 
 URL = "https://wikimedia.org/api/rest_v1/metrics/pageviews/top/{lang}.wikipedia/all-access/{day:%Y/%m/%d}"
-USER_AGENT = "ContentOS/0.1 (trend research; open source)"
+# Wikimedia exige un User-Agent descriptivo con datos de contacto (https://w.wiki/4wJS); sin ellos responde 403
+USER_AGENT = "ContentOS/0.1 (https://github.com/visualmindai777-C/contentos; trend research) httpx"
 
 
 class WikipediaSource:
