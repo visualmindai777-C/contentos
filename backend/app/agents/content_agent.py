@@ -7,6 +7,7 @@ from app.core.types import ContentDraft, LLMResponse, Message, ProjectContext
 
 WORDS_PER_SECOND = 3  # medido con Kokoro en español: ~55 palabras ≈ 18 s
 MIN_SCRIPT_WORDS = 30
+MAX_TOKENS = 4000  # el JSON ocupa ~400; el resto es margen para modelos que razonan antes de responder
 
 SYSTEM = (
     "Eres guionista de vídeos cortos verticales (TikTok, Instagram Reels, Threads, X). "
@@ -81,7 +82,7 @@ class ContentAgent:
 
         tokens, last = 0, InvalidDraft("sin intentos")
         for _ in range(self._max_attempts):
-            response = await self._llm.complete(messages, json_mode=True)
+            response = await self._llm.complete(messages, json_mode=True, max_tokens=MAX_TOKENS)
             tokens += response.tokens_used
             try:
                 return parse_draft(response.text), dataclasses.replace(response, tokens_used=tokens)

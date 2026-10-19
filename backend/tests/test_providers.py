@@ -58,6 +58,27 @@ def test_openrouter_logs_why_each_model_failed(caplog):
     assert len(failed) == 1 and failed[0].fields["model"] == "dead" and "404" in failed[0].fields["error"]
 
 
+def test_openrouter_empty_reply_reports_finish_reason_and_asks_for_low_reasoning():
+    captured = {}
+
+    def handler(req):
+        captured.update(json.loads(req.content))
+        return httpx.Response(200, json={"choices": [{"message": {"content": None}, "finish_reason": "length"}]})
+
+    with pytest.raises(ProviderError, match="finish_reason=length.*max_tokens") as exc:
+        run(OpenRouterClient("k", ["m1"], transport=transport(handler)).complete(MSG, max_tokens=4000))
+    assert not isinstance(exc.value, RateLimitError)
+    assert captured["reasoning"] == {"effort": "low"} and captured["max_tokens"] == 4000
+
+
+def test_openrouter_transient_limit_wins_over_other_failures():
+    def handler(req):
+        return httpx.Response(429) if json.loads(req.content)["model"] == "m1" else httpx.Response(200, json=completion(""))
+
+    with pytest.raises(RateLimitError):  # m1 limitado + m2 vacío → transitorio, no es culpa del contenido
+        run(OpenRouterClient("k", ["m1", "m2"], transport=transport(handler)).complete(MSG))
+
+
 def test_openrouter_all_models_rate_limited():
     client = OpenRouterClient("k", ["m1", "m2"], transport=transport(lambda r: httpx.Response(429)))
     with pytest.raises(RateLimitError):
