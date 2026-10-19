@@ -1,7 +1,7 @@
 # Despliega solo lo que cambió: Worker (cloudflare/), portal (frontend/) y API en HuggingFace Spaces (backend/).
 #
 # Secrets: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, HF_TOKEN (permiso de escritura)
-# Variable: HF_SPACE (usuario/space). Los secrets de ejecución de cada servicio se cargan UNA vez en su plataforma
+# Variables: HF_SPACE (usuario/space) y DEPLOY_ENABLED=true (interruptor general). Los secrets de ejecución de cada servicio se cargan UNA vez en su plataforma
 # (wrangler secret put / ajustes del Space) y persisten entre despliegues.
 name: deploy
 
@@ -20,6 +20,8 @@ permissions:
 
 jobs:
   changes:
+    # Inactivo hasta definir la variable DEPLOY_ENABLED=true (después de cargar los secrets de abajo)
+    if: vars.DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     outputs:
       worker: ${{ steps.diff.outputs.worker }}
@@ -31,7 +33,8 @@ jobs:
           fetch-depth: 2
       - id: diff
         run: |
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+          # Sin commit anterior (primer push) se despliega todo
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] || ! git rev-parse -q --verify HEAD^ > /dev/null; then
             files=$(printf 'cloudflare/\nfrontend/\nbackend/\n')
           else
             files=$(git diff --name-only HEAD^ HEAD)
