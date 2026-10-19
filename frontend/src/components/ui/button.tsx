@@ -11,7 +11,8 @@ export const buttonVariants = cva(
         outline: "border bg-card hover:bg-muted",
         destructive: "bg-destructive text-white hover:opacity-90",
       },
-      size: { default: "h-9 px-4", sm: "h-8 px-3 text-xs" },
+      // En móvil los objetivos táctiles miden ~44 px; en escritorio vuelven al tamaño compacto
+      size: { default: "h-11 px-4 md:h-9", sm: "h-10 px-3 text-xs md:h-8" },
     },
     defaultVariants: { variant: "default", size: "default" },
   },

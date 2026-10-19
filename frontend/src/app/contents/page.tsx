@@ -49,7 +49,13 @@ export default async function ContentsPage({ searchParams }: { searchParams: Pro
 
       <Table>
         <THead>
-          <TR><TH>Título</TH><TH>Proyecto</TH><TH>Estado</TH><TH>Modelo IA</TH><TH>Fecha</TH></TR>
+          <TR>
+            <TH>Título</TH>
+            <TH className="hidden md:table-cell">Proyecto</TH>
+            <TH>Estado</TH>
+            <TH className="hidden md:table-cell">Modelo IA</TH>
+            <TH>Fecha</TH>
+          </TR>
         </THead>
         <TBody>
           {items.map((c) => (
@@ -57,12 +63,12 @@ export default async function ContentsPage({ searchParams }: { searchParams: Pro
               <TD className="max-w-80 truncate font-medium">
                 <Link href={`/contents/${c.id}`} prefetch={false} className="hover:underline">{c.title || "(pendiente de generar)"}</Link>
               </TD>
-              <TD>{names.get(c.project_id) ?? "—"}</TD>
+              <TD className="hidden md:table-cell">{names.get(c.project_id) ?? "—"}</TD>
               <TD className="space-x-1">
                 <StatusBadge status={c.status} />
                 {c.last_error && <Badge variant="danger" title={c.last_error}>error</Badge>}
               </TD>
-              <TD className="max-w-48 truncate">{c.model_name || "—"}</TD>
+              <TD className="hidden max-w-48 truncate md:table-cell">{c.model_name || "—"}</TD>
               <TD>{formatDate(c.created_at)}</TD>
             </TR>
           ))}
