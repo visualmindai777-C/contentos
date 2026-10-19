@@ -51,10 +51,16 @@ async def database_problem() -> str | None:
             await conn.execute(text("select 1"))
     except Exception as e:
         detail = str(e).strip().splitlines()[0][:200] if str(e).strip() else type(e).__name__
+        pw = url.password or ""
+        # Solo rasgos de la contraseña (nunca el valor): ayudan a detectar errores típicos al pegarla
+        shape = (
+            f"contraseña: {len(pw)} caracteres, alfanumérica={pw.isalnum()}, "
+            f"espacios_en_los_extremos={pw != pw.strip()}, vacía={not pw}"
+        )
         return (
             f"No se pudo conectar a la base de datos (usuario={url.username}, host={url.host}, puerto={url.port}, "
-            f"base={url.database}). Con el pooler de Supabase el usuario debe ser postgres.<ref-del-proyecto> y la "
-            f"contraseña la del proyecto. Detalle: {detail}"
+            f"base={url.database}; {shape}). Con el pooler de Supabase el usuario debe ser postgres.<ref-del-proyecto> "
+            f"y la contraseña la del proyecto. Detalle: {detail}"
         )
     return None
 
