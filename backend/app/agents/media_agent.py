@@ -11,13 +11,13 @@ from app.core.types import ContentDraft, GeneratedImage, MediaBundle, ProjectCon
 
 logger = logging.getLogger("app.pipeline")
 
-IMAGE_SIZE = (720, 1280)  # el vídeo sale en 1080x1920; a esta resolución Pollinations va más rápido
+IMAGE_SIZE = (768, 1024)  # el vídeo sale en 1080x1920; a esta resolución Pollinations va más rápido
 MIN_IMAGES = 2
 DEFAULT_CROP_BOTTOM = 0.05  # Pollinations anónimo estampa su logo en el ~3 % inferior; nologo=true se ignora sin clave
 DEFAULT_WAIT = 45.0  # Pollinations anónimo: 1 imagen cada ~45 s por IP
 TRANSIENT_WAIT = 5.0  # timeouts y errores de red del proveedor
 MAX_WAIT = 120.0
-DEFAULT_STYLE = "cinematic digital illustration, dramatic lighting, highly detailed, vertical 9:16, no text, no watermark"
+DEFAULT_STYLE = "cinematic digital illustration, dramatic lighting, highly detailed, natural proportions, no text, no watermark"
 
 _EMOJI = re.compile("[\U0001f300-\U0001faff☀-➿️]")
 _MARKUP = re.compile(r"[#*_`~<>]")
