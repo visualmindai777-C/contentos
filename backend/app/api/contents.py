@@ -78,7 +78,7 @@ async def regenerate(content_id: UUID, svc: Contents):
 
 class IdeaRequest(BaseModel):
     project_id: UUID
-    prompt: str = Field(min_length=10, max_length=1000)
+    prompt: str = Field(min_length=10, max_length=4000)
 
 
 @router.post("/from-idea", response_model=ApiResponse[dict])

@@ -25,6 +25,7 @@ class TrendCandidate:
     score: float
     keywords: list[str]
     source: str
+    summary: str = ""
 
 
 # --- LLM ---

@@ -361,3 +361,49 @@ def test_novela_next_part_prompt_carries_the_story_so_far_and_closes_on_the_last
     run(agent.run(project, "tema", [], previous="PARTE 1 — Titulo\nLUCÍA: hola", part=3))
     assert "PARTE 1" in seen[0] and "(Parte 2)" in seen[0] and "cliffhanger" in seen[0]
     assert "(Parte 3)" in seen[1] and "última parte" in seen[1]
+
+
+def test_user_instructions_are_prepended_with_priority():
+    from app.agents.content_agent import ContentAgent
+    from app.core.types import LLMResponse
+
+    seen = []
+    reply = json.dumps({"title": "T", "hook": "h", "script": "palabra " * 40, "caption": "c", "hashtags": ["#a"], "cta": "x"})
+
+    class LLM:
+        async def complete(self, messages, *, json_mode=False, max_tokens=1200):
+            seen.append(messages[-1].content)
+            return LLMResponse(reply, "fake", "m", 5)
+
+    project = ProjectContext(uuid.uuid4(), "N", "general", "es", {})
+    run(ContentAgent(LLM()).run(project, "Haz esto EXACTO: A, luego B", [], instructions=True))
+    assert seen[0].startswith("INSTRUCCIONES DEL USUARIO") and "Haz esto EXACTO: A, luego B" in seen[0]
+
+
+def test_sources_give_a_short_summary():
+    from app.providers.trends.hackernews import HackerNewsSource
+
+    rss = """<?xml version="1.0"?><rss xmlns:ht="https://trends.google.com/trending/rss" version="2.0"><channel>
+<item><title>modelo nuevo</title><ht:approx_traffic>200K+</ht:approx_traffic>
+<ht:news_item><ht:news_item_title>Lanzan un modelo</ht:news_item_title><ht:news_item_snippet>Promete mejorar la traducción.</ht:news_item_snippet></ht:news_item></item></channel></rss>"""
+    (g,) = run(GoogleTrendsSource(transport=transport(lambda r: httpx.Response(200, text=rss))).fetch(PROJECT, 5))
+    assert g.summary == "Lanzan un modelo. Promete mejorar la traducción. (200K+ búsquedas)"
+
+    atom = """<feed xmlns="http://www.w3.org/2005/Atom"><entry><title>Con texto</title><content type="html">&lt;p&gt;Mi suegra descubrió que llevo meses ahorrando en secreto para irme.&lt;/p&gt; submitted by /u/x [link] [comments]</content></entry>
+<entry><title>Solo enlace</title><content type="html">&lt;a&gt;submitted by /u/y&lt;/a&gt; [link] [comments]</content></entry></feed>"""
+    posts = run(RedditSource(transport=transport(lambda r: httpx.Response(200, text=atom))).fetch(
+        ProjectContext(uuid.uuid4(), "P", "ia", "es", {"subreddits": ["relationships"]}), 5))
+    assert posts[0].summary.startswith("Mi suegra descubrió") and posts[0].summary.endswith("(r/relationships)")
+    assert posts[1].summary == "Entre lo más votado hoy en r/relationships"
+
+    hn = {"hits": [{"title": "Stripe sube precios", "points": 120, "num_comments": 45, "url": "https://www.stripe.com/blog"}]}
+    (h,) = run(HackerNewsSource(transport=transport(lambda r: httpx.Response(200, json=hn))).fetch(PROJECT, 5))
+    assert h.summary == "120 puntos y 45 comentarios en Hacker News · stripe.com"
+
+    def wiki(req):
+        if "rest_v1/page/summary" in str(req.url):
+            return httpx.Response(200, json={"extract": "Es un actor mexicano. " * 20})
+        return httpx.Response(200, json={"items": [{"articles": [{"article": "Actor_X", "views": 90000}]}]})
+
+    (w,) = run(WikipediaSource(transport=transport(wiki)).fetch(PROJECT, 5))
+    assert w.summary.startswith("Es un actor mexicano.") and w.summary.endswith("…") and len(w.summary) <= 262

@@ -16,6 +16,8 @@ export interface Project {
 }
 
 export interface Topic {
+  summary: string;
+  used: boolean;
   id: string;
   project_id: string;
   topic: string;
@@ -116,6 +118,7 @@ export interface IdeaVerdict {
   title: string;
   improvement: string;
   content_id: string | null;
+  mode: "guion" | "idea";
 }
 
 export interface SeriesPart {

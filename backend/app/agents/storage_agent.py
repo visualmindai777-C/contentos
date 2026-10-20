@@ -30,11 +30,17 @@ class Job:
     keywords: list[str]
     draft: ContentDraft | None
     part: int = 1
+    instructions: bool = False  # el tema es un texto del propio usuario (Mi idea): se sigue al pie de la letra
     previous: str = ""  # guiones de las partes anteriores de la serie
 
 
 def _context(p: Project) -> ProjectContext:
     return ProjectContext(id=p.id, name=p.name, niche=p.niche, language=p.language, config=p.config or {})
+
+
+def _with_summary(topic) -> str:
+    """El guionista recibe el titular y, si la fuente lo dio, su resumen. Las ideas del usuario van tal cual."""
+    return f"{topic.topic}. {topic.summary}" if topic.summary and topic.source != "idea" else topic.topic
 
 
 class StorageAgent:
@@ -68,8 +74,9 @@ class StorageAgent:
         draft = ContentDraft(content.title, content.hook, content.script, content.caption, content.hashtags, content.cta)
         return Job(
             content_id=content.id, status="guion" if has_script else "idea", project=_context(project),
-            topic=topic.topic if topic else content.title, keywords=topic.keywords if topic else [],
+            topic=_with_summary(topic) if topic else content.title, keywords=topic.keywords if topic else [],
             draft=draft if has_script else None, part=content.part,
+            instructions=bool(topic and topic.source == "idea"),
             previous="\n\n".join(f"PARTE {n} — {title}\n{script}" for n, title, script in earlier),
         )
 
@@ -92,7 +99,7 @@ class StorageAgent:
                 return None
             content = await ContentRepository(s).save(Content(project_id=project_id, topic_id=topic.id))
             await s.commit()
-        return content.id, topic.topic, topic.keywords
+        return content.id, _with_summary(topic), topic.keywords
 
     # --- avance del flujo ---
     async def save_draft(self, content_id: UUID, draft: ContentDraft, llm: LLMResponse) -> None:

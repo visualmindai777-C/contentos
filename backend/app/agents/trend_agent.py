@@ -44,5 +44,5 @@ class TrendAgent:
             score = min(100.0, round(c.score * weights.get(c.source, 1.0) + bonus, 1))
             key = c.topic.casefold()
             if key not in best or score > best[key].score:
-                best[key] = TrendCandidate(c.topic, score, c.keywords, c.source)
+                best[key] = TrendCandidate(c.topic, score, c.keywords, c.source, c.summary)
         return sorted(best.values(), key=lambda c: c.score, reverse=True)[: self._keep]

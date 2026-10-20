@@ -1,4 +1,6 @@
 import asyncio
+import html
+import re
 import xml.etree.ElementTree as ET
 
 import httpx
@@ -42,11 +44,25 @@ class RedditSource:
             params={"t": "day", "limit": limit}, headers={"User-Agent": USER_AGENT},
         )
         try:
-            titles = [(e.findtext(f"{ATOM}title") or "").strip() for e in ET.fromstring(resp.text).iter(f"{ATOM}entry")]
+            entries = [
+                ((e.findtext(f"{ATOM}title") or "").strip(), e.findtext(f"{ATOM}content") or "")
+                for e in ET.fromstring(resp.text).iter(f"{ATOM}entry")
+            ]
         except ET.ParseError as e:
             raise ProviderError(f"reddit: feed inválido de r/{sub}") from e
-        titles = [t for t in titles if t]
+        entries = [(t, c) for t, c in entries if t]
         return [
-            TrendCandidate(topic=t, score=round(100 * (1 - i / len(titles)), 1), keywords=extract_keywords(t), source=self.name)
-            for i, t in enumerate(titles)
+            TrendCandidate(
+                topic=t, score=round(100 * (1 - i / len(entries)), 1), keywords=extract_keywords(t), source=self.name,
+                summary=self._summary(sub, c),
+            )
+            for i, (t, c) in enumerate(entries)
         ]
+
+    @staticmethod
+    def _summary(sub: str, content: str) -> str:
+        """Texto del post si lo tiene (los enlaces solo traen 'submitted by'); si no, de dónde viene."""
+        text = html.unescape(re.sub(r"<[^>]+>", " ", html.unescape(content)))
+        text = re.sub(r"submitted by.*$|\[link\]|\[comments\]", " ", text, flags=re.DOTALL)
+        text = re.sub(r"\s+", " ", text).strip()
+        return f"{text[:240]} (r/{sub})" if len(text) >= 25 else f"Entre lo más votado hoy en r/{sub}"

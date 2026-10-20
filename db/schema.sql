@@ -36,6 +36,7 @@ CREATE TABLE topics (
   topic       text NOT NULL,
   keywords    jsonb NOT NULL DEFAULT '[]',
   source      text NOT NULL,                  -- google_trends | reddit | ...
+  summary     text NOT NULL DEFAULT '',       -- resumen corto que da la propia fuente
   score       numeric(6,2) NOT NULL DEFAULT 0,
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now(),

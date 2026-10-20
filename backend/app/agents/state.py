@@ -14,6 +14,7 @@ class PipelineState(TypedDict, total=False):
     topic: str
     keywords: list[str]
     part: int
+    instructions: bool
     previous: str
     has_unused: bool
     candidates: list[TrendCandidate]

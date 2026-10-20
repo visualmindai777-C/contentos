@@ -1,3 +1,5 @@
+from urllib.parse import urlparse
+
 import httpx
 
 from app.core.interfaces import ProviderError
@@ -28,6 +30,8 @@ class HackerNewsSource:
             TrendCandidate(
                 topic=h["title"].strip(), score=log_score(h.get("points") or 0, 10, 1_000),
                 keywords=extract_keywords(h["title"]), source=self.name,
+                summary=f"{h.get('points') or 0} puntos y {h.get('num_comments') or 0} comentarios en Hacker News"
+                + (f" · {urlparse(h['url']).netloc.removeprefix('www.')}" if h.get("url") else ""),
             )
             for h in hits if h.get("title")
         ]

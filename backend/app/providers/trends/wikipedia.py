@@ -1,6 +1,10 @@
+import asyncio
 from datetime import UTC, datetime, timedelta
+from urllib.parse import quote
 
 import httpx
+
+from dataclasses import replace
 
 from app.core.interfaces import ProviderError
 from app.core.types import ProjectContext, TrendCandidate
@@ -39,4 +43,18 @@ class WikipediaSource:
             found.append(TrendCandidate(
                 topic=title, score=log_score(a["views"], 1_000, 500_000), keywords=extract_keywords(title), source=self.name,
             ))
-        return found[:limit]
+        top = found[:limit]
+        summaries = await asyncio.gather(*(self._extract(project.language, c.topic) for c in top))
+        return [replace(c, summary=s) for c, s in zip(top, summaries)]
+
+    async def _extract(self, lang: str, title: str) -> str:
+        """Primer párrafo del artículo. Si falla, el tema se queda sin resumen: no es motivo para perder la tendencia."""
+        try:
+            resp = await http_request(
+                "wikipedia", "GET", f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{quote(title.replace(' ', '_'), safe='')}",
+                transport=self._transport, headers={"User-Agent": USER_AGENT},
+            )
+            text = str(resp.json().get("extract", "")).strip()
+        except (ProviderError, ValueError):
+            return ""
+        return text if len(text) <= 260 else text[:260].rsplit(" ", 1)[0] + "…"

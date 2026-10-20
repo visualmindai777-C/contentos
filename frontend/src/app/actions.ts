@@ -94,6 +94,31 @@ export async function discoverTrends(projectId: string, mode: string): Promise<s
   }
 }
 
+// Crea el video y se queda en la pantalla: así se pueden encolar varios temas seguidos
+export async function queueVideoFromTopic(projectId: string, topicId: string, title: string): Promise<{ id?: string; error?: string }> {
+  try {
+    const id = (await api.createContent({ project_id: projectId, topic_id: topicId, title })).id;
+    refresh();
+    return { id };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function deleteTopic(id: string): Promise<string | undefined> {
+  return run(() => api.deleteTopic(id));
+}
+
+export async function clearTopics(projectId: string): Promise<string> {
+  try {
+    const { removed } = await api.clearTopics(projectId);
+    refresh();
+    return removed ? `Descartadas ${removed} tendencias sin usar` : "No había tendencias sin usar";
+  } catch (e) {
+    return message(e);
+  }
+}
+
 export async function createContentFromTopic(projectId: string, topicId: string, title: string) {
   let id: string;
   try {

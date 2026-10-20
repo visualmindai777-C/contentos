@@ -92,6 +92,8 @@ export const api = {
   topics: (q: Query) => get<Topic[]>(`/topics${qs(q)}`),
   discoverTopics: (b: { project_id: string; mode: string }) => request<{ found: number; added: number }>("POST", "/topics/discover", b),
   evaluateIdea: (b: { project_id: string; prompt: string }) => request<IdeaVerdict>("POST", "/contents/from-idea", b),
+  deleteTopic: (id: string) => request<{ deleted: boolean }>("DELETE", `/topics/${id}`),
+  clearTopics: (project_id: string) => request<{ removed: number }>("POST", "/topics/clear", { project_id }),
   createTopic: (b: { project_id: string; topic: string }) => request<Topic>("POST", "/topics", b),
 
   contents: (q: Query) => get<ContentSummary[]>(`/contents${qs(q)}`),

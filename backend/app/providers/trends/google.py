@@ -44,7 +44,13 @@ class GoogleTrendsSource:
             if not topic:
                 continue
             news = item.findtext("ht:news_item/ht:news_item_title", default="", namespaces=NS)
+            snippet = item.findtext("ht:news_item/ht:news_item_snippet", default="", namespaces=NS)
+            traffic = (item.findtext("ht:approx_traffic", default="", namespaces=NS) or "").strip()
+            summary = ". ".join(p.strip() for p in (news, snippet) if p and p.strip())
+            if traffic:
+                summary += f" ({traffic} búsquedas)"
             found.append(TrendCandidate(
+                summary=summary[:400],
                 topic=topic,
                 score=log_score(_traffic(item.findtext("ht:approx_traffic", default="", namespaces=NS)), 100, 1_000_000),
                 keywords=extract_keywords(f"{topic} {news}"),

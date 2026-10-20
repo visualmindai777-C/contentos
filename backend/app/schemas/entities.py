@@ -45,6 +45,8 @@ class TopicOut(ORMModel):
     topic: str
     keywords: list[str]
     source: str
+    summary: str = ""
+    used: bool = False  # ya tiene un contenido creado a partir de este tema
     score: float
     created_at: datetime
 

@@ -356,7 +356,7 @@ def test_idea_viable_is_queued_and_unviable_is_not():
             return good, bad, low, await r.contents()
 
     good, bad, low, contents = run(scenario())
-    assert good["viable"] and good["content_id"] and not bad["viable"] and bad["content_id"] is None and not low["viable"]
+    assert good["mode"] == "idea" and good["viable"] and good["content_id"] and not bad["viable"] and bad["content_id"] is None and not low["viable"]
     assert [c.status for c in contents] == ["idea"] and contents[0].title == "Mi idea (Parte 1)"
 
 
@@ -398,3 +398,80 @@ def test_next_part_requires_a_generated_content():
                     await ContentService(s).next_part(idea.id)
 
     run(scenario())
+
+
+def test_topics_list_sorts_by_score_and_hides_pasted_ideas():
+    from app.services.ideas import IdeaService
+    from app.services.topics import TopicService
+
+    verdict = {"viable": True, "score": 80, "reason": "ok", "risks": [], "title": "T", "improvement": "",
+               "hook": "h", "caption": "c", "hashtags": ["x"]}
+
+    async def scenario():
+        async with rig() as r:
+            async with r.sf() as s:
+                s.add_all([Topic(project_id=r.pid, topic="bajo", source="reddit", score=10),
+                           Topic(project_id=r.pid, topic="alto", source="google_trends", score=90),
+                           Topic(project_id=r.pid, topic="medio", source="wikipedia", score=50)])
+                await s.commit()
+            async with r.sf() as s:
+                await IdeaService(s, _idea_llm(verdict)).evaluate(r.pid, "Una idea que pego yo mismo en Mi idea")
+            async with r.sf() as s:
+                by_score = [t.topic for t in await TopicService(s).list(r.pid, 50, 0, "score", 7)]
+            job = await r.agents.storage.load_job((await r.contents())[0].id)
+            return by_score, job
+
+    by_score, job = run(scenario())
+    assert by_score == ["alto", "medio", "bajo"]  # la idea pegada no aparece
+    assert job.instructions is True
+
+
+def test_idea_with_a_ready_screenplay_skips_the_llm_script_and_goes_straight_to_media():
+    from app.services.ideas import IdeaService
+
+    script = "PERSONAJES\nANA | f | young woman, red hair\nESCENA | Ana in a kitchen, medium shot\nANA: Hola.\nANA: ¿Me oyes?\nESCENA | Ana outside, medium shot\nANA: Adiós.\nANA: Hasta luego."
+    verdict = {"viable": True, "score": 77, "reason": "ok", "risks": [], "title": "Mi guion", "improvement": "",
+               "hook": "Hola.", "caption": "Una pregunta", "hashtags": ["novela", "#drama"]}
+
+    async def scenario():
+        async with rig() as r:
+            async with r.sf() as s:
+                out = await IdeaService(s, _idea_llm(verdict)).evaluate(r.pid, script)
+            (content,) = await r.contents()
+            return out, content
+
+    out, content = run(scenario())
+    assert out["mode"] == "guion" and "hook" not in out
+    assert (content.status, content.script, content.hashtags, content.topic_id) == ("guion", script, ["#novela", "#drama"], None)
+
+
+def test_topics_can_be_deleted_and_unused_ones_cleared_in_bulk():
+    from app.core.errors import NotFound
+    from app.services.topics import TopicService
+
+    async def scenario():
+        async with rig() as r:
+            async with r.sf() as s:
+                keep, drop, mine = (Topic(project_id=r.pid, topic=t, source=src, score=1, summary="resumen")
+                                    for t, src in (("usado", "reddit"), ("sin usar", "reddit"), ("idea mia", "idea")))
+                s.add_all([keep, drop, mine])
+                await s.flush()
+                s.add(Content(project_id=r.pid, topic_id=keep.id))
+                await s.commit()
+            async with r.sf() as s:
+                svc = TopicService(s)
+                listed = {t.topic: t.used for t in await svc.list(r.pid, 50, 0)}
+                removed = await svc.clear_unused(r.pid)
+            async with r.sf() as s:
+                remaining = {t.topic for t in (await s.scalars(select(Topic).where(Topic.project_id == r.pid))).all()}
+                await TopicService(s).delete(keep.id)
+            async with r.sf() as s:
+                with pytest.raises(NotFound):
+                    await TopicService(s).delete(keep.id)
+                content = (await s.scalars(select(Content).where(Content.project_id == r.pid))).one()
+            return listed, removed, remaining, content
+
+    listed, removed, remaining, content = run(scenario())
+    assert listed == {"usado": True, "sin usar": False}  # la idea del usuario no se lista
+    assert removed == 1 and remaining == {"usado", "idea mia"}
+    assert content.topic_id is None  # el contenido sobrevive al borrado del tema

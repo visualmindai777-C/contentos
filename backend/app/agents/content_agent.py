@@ -93,6 +93,11 @@ Devuelve exactamente este JSON:
 
 DEFAULT_MAX_PARTS = 5
 
+USER_INSTRUCTIONS = """INSTRUCCIONES DEL USUARIO (tienen prioridad sobre cualquier regla de abajo sobre personajes, escenas, tono, duración o formato; síguelas al pie de la letra y conserva sus nombres, hechos y orden):
+\"\"\"{topic}\"\"\"
+
+"""
+
 
 class InvalidDraft(ProviderError):
     """El LLM respondió, pero no con el JSON esperado."""
@@ -139,7 +144,7 @@ class ContentAgent:
         self._max_attempts = max_attempts
 
     async def run(
-        self, project: ProjectContext, topic: str, keywords: list[str], *, previous: str = "", part: int = 1,
+        self, project: ProjectContext, topic: str, keywords: list[str], *, previous: str = "", part: int = 1, instructions: bool = False,
     ) -> tuple[ContentDraft, LLMResponse]:
         seconds = int(project.config.get("target_seconds", 40))
         novela = project.config.get("format") == "novela"
@@ -159,6 +164,8 @@ class ContentAgent:
             tone=project.config.get("tone", "curioso, directo y cercano"), topic=topic,
             keywords=", ".join(keywords) or "—", seconds=seconds, words=seconds * WORDS_PER_SECOND,
         )
+        if instructions:
+            prompt = USER_INSTRUCTIONS.format(topic=topic) + prompt
         messages = [Message("system", SYSTEM), Message("user", prompt)]
         return await self._complete(messages, novela)
 

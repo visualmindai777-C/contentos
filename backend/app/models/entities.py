@@ -47,6 +47,7 @@ class Topic(Entity):
     topic: Mapped[str]
     keywords: Mapped[list[str]] = mapped_column(JSONB, default=list)
     source: Mapped[str]
+    summary: Mapped[str] = mapped_column(default="")
     score: Mapped[float] = mapped_column(Numeric(6, 2, asdecimal=False), default=0)
 
 

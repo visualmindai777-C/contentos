@@ -26,16 +26,16 @@ export function IdeaForm({ projects }: { projects: { id: string; name: string }[
           </Select>
         )}
         <label className="block space-y-1">
-          <span className="text-sm font-medium">Tu idea o prompt</span>
+          <span className="text-sm font-medium">Tu guion o instrucciones</span>
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            maxLength={1000}
+            maxLength={4000}
             rows={6}
-            placeholder="Ej: Una chica descubre que su mejor amiga lleva meses copiando sus ideas de negocio y se las vende a la competencia..."
+            placeholder={"Pega tu guion ya listo (PERSONAJES / ESCENA / diálogos) o tus instrucciones exactas.\n\nSi pegas el guion, se usa tal cual: la IA solo lo revisa y el sistema genera imágenes, voz y video."}
             className="w-full rounded-md border bg-card p-3 text-base outline-none focus:ring-2 focus:ring-primary/30"
           />
-          <span className="block text-right text-xs text-muted-foreground">{prompt.length}/1000</span>
+          <span className="block text-right text-xs text-muted-foreground">{prompt.length}/4000</span>
         </label>
         <Button
           className="w-full"
@@ -52,7 +52,7 @@ export function IdeaForm({ projects }: { projects: { id: string; name: string }[
         >
           {pending ? "La IA está evaluando…" : "Verificar y crear"}
         </Button>
-        <p className="text-xs text-muted-foreground">La IA revisa si es segura para las plataformas, si se puede contar en ~40 s y si tiene potencial. Solo si es viable se crea.</p>
+        <p className="text-xs text-muted-foreground">La IA revisa que sea segura para las plataformas y que tenga potencial. Un guion se usa tal cual; unas instrucciones se siguen al pie de la letra. Solo se crea si es viable, y no aparece en Temas.</p>
       </div>
 
       {error && <p role="alert" className="rounded-lg border border-red-300 bg-card p-3 text-sm text-destructive">{error}</p>}
@@ -74,7 +74,9 @@ export function IdeaForm({ projects }: { projects: { id: string; name: string }[
           )}
           {verdict.viable && verdict.content_id && (
             <div className="space-y-2">
-              <p className="text-sm font-medium">Creado: «{verdict.title}» ya está en cola.</p>
+              <p className="text-sm font-medium">{verdict.mode === "guion"
+                  ? `Creado: «${verdict.title}». Se usó tu guion tal cual; ya está en cola para imágenes, voz y video.`
+                  : `Creado: «${verdict.title}». Ya está en cola: se escribirá siguiendo tus instrucciones.`}</p>
               <Link href={`/contents/${verdict.content_id}`} className={cn(buttonVariants({ variant: "outline" }), "w-full")}>Ver en el portal</Link>
             </div>
           )}
