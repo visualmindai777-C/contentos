@@ -71,6 +71,8 @@ export interface DashboardStats {
   published: number;
   rejected: number;
   pending: number;
+  scripted: number;
+  review: number;
   topics: number;
   queued: number;
   failed: number;

@@ -16,7 +16,7 @@ class DashboardService:
         m = await self.metrics.snapshot(datetime.now(UTC))
         return DashboardStats(
             total=m.total, approved=m.approved, published=m.published, rejected=m.rejected,
-            pending=m.pending, topics=m.topics, queued=m.queued, failed=m.failed,
+            pending=m.pending, topics=m.topics, queued=m.queued, failed=m.failed, scripted=m.scripted, review=m.review,
         )
 
     async def queue(self) -> QueueStatus:

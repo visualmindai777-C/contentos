@@ -26,6 +26,24 @@ export async function reject(id: string) {
   return run(() => api.reject(id));
 }
 
+export async function runPipeline(): Promise<string> {
+  const base = process.env.WORKER_URL;
+  if (!base) return "Falta configurar WORKER_URL.";
+  try {
+    const res = await fetch(`${base}/run`, {
+      method: "POST",
+      cache: "no-store",
+      signal: AbortSignal.timeout(30_000),
+      headers: { "x-api-key": process.env.API_KEY ?? "" },
+    });
+    const body = (await res.json().catch(() => null)) as { message?: string } | null;
+    refresh();
+    return body?.message ?? `Error ${res.status}`;
+  } catch {
+    return "No se pudo contactar con el generador.";
+  }
+}
+
 export async function purge(id: string) {
   try {
     await api.purge(id);

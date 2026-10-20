@@ -8,6 +8,7 @@ from app.models import Asset, Content, Topic
 from app.repositories.base import Repository
 
 QUEUE = ("idea", "guion")
+REVIEW = (S.GENERADO.value, S.REVISADO.value)
 PENDING = (S.IDEA.value, S.GUION.value, S.GENERADO.value, S.REVISADO.value)
 
 
@@ -19,6 +20,8 @@ class Snapshot:
     rejected: int
     pending: int
     queued: int
+    scripted: int
+    review: int
     failed: int
     tokens: int
     llm_calls: int
@@ -37,6 +40,8 @@ class MetricsRepository(Repository):
             func.count().filter(c.status == S.RECHAZADO.value),
             func.count().filter(c.status.in_(PENDING)),
             func.count().filter(c.status.in_(QUEUE), c.last_error == ""),
+            func.count().filter(c.status == S.GUION.value, c.last_error == ""),
+            func.count().filter(c.status.in_(REVIEW)),
             func.count().filter(c.status.in_(QUEUE), c.last_error != ""),
             func.coalesce(func.sum(c.tokens_used), 0),
             func.count().filter(c.llm_provider != "", c.updated_at >= since),

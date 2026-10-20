@@ -21,7 +21,7 @@ async function SidebarMonitor() {
 
 async function BottomNavLoader() {
   const stats = await api.stats().catch(() => null);
-  return <BottomNav badge={stats?.pending} />;
+  return <BottomNav badge={stats?.review} />;
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

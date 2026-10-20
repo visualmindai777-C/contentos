@@ -136,6 +136,8 @@ class DashboardStats(BaseModel):
     topics: int
     queued: int  # esperan al pipeline (idea/guion sin error)
     failed: int  # idea/guion con error: esperan un reintento manual
+    scripted: int = 0  # en guion sin error: ya tienen texto y esperan imágenes, voz y video
+    review: int = 0  # generado/revisado: esperan tu decisión
 
 
 class QueueStatus(BaseModel):

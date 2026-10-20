@@ -3,6 +3,7 @@ import { approve, publish, purge, regenerate, reject, retry } from "@/app/action
 import { ActionButton } from "@/components/action-button";
 import { ActionForm } from "@/components/action-form";
 import { CopyButton } from "@/components/copy-button";
+import { Stepper } from "@/components/stepper";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -58,6 +59,9 @@ export default async function ContentDetailPage({ params }: { params: Promise<{ 
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={status} />
           <span className="text-sm text-muted-foreground">{statusHint[status]}</span>
+        </div>
+        <div className="pt-2">
+          <Stepper status={status} />
         </div>
       </div>
 

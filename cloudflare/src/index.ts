@@ -60,6 +60,24 @@ export default {
         last: last && { conclusion: last.conclusion, updated_at: last.updated_at, url: last.html_url },
       });
     }
+
+    // "Procesar ahora" desde el portal: lanza el pipeline sobre la cola sin esperar al cron
+    if (pathname === "/run" && request.method === "POST") {
+      if (!authorized(request, env)) return new Response("Unauthorized", { status: 401 });
+      try {
+        if ((await listRuns(env)).some((r) => r.status !== "completed")) {
+          return Response.json({ started: false, message: "Ya se está generando algo ahora mismo." });
+        }
+        const pending = await pendingInQueue(env);
+        if (pending === 0) return Response.json({ started: false, message: "No hay nada en cola." });
+        await ensureEnabled(env);
+        await dispatch(env, { limit: String(Math.min(pending, 3)), queue_only: "true" });
+        return Response.json({ started: true, message: "Listo: empezó a generar. Tarda unos minutos." });
+      } catch (e) {
+        console.error(`/run falló: ${e}`);
+        return Response.json({ started: false, message: "No se pudo iniciar. Reintenta en un momento." }, { status: 502 });
+      }
+    }
     return new Response("Not Found", { status: 404 });
   },
 } satisfies ExportedHandler<Env>;

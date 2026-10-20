@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { AutoRefresh } from "@/components/auto-refresh";
+import { RunButton } from "@/components/run-button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { api } from "@/lib/api";
@@ -13,10 +15,13 @@ export default async function ReviewPage() {
   ]);
   const toReview = [...generated, ...reviewed].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
   const failed = [...ideas, ...scripts].filter((c) => c.last_error);
+  const cooking = [...ideas, ...scripts].filter((c) => !c.last_error);
+  const progress = (status: string) => (status === "guion" ? 60 : 20);
 
   return (
     <>
       <h1 className="text-xl font-semibold">Revisar</h1>
+      <AutoRefresh active={cooking.length > 0} />
 
       {failed.length > 0 && (
         <section className="space-y-2">
@@ -33,12 +38,32 @@ export default async function ReviewPage() {
         </section>
       )}
 
+      {cooking.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold">En proceso ({cooking.length}) · aún no se pueden revisar</h2>
+          <Card className="divide-y">
+            {cooking.map((c) => (
+              <Link key={c.id} href={`/contents/${c.id}`} className="block space-y-2 px-4 py-3 hover:bg-muted">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate font-medium">{c.title || "Tema en cola"}</p>
+                  <Badge variant="info">{c.status === "guion" ? "Haciendo video" : "En cola"}</Badge>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuenow={progress(c.status)} aria-valuemin={0} aria-valuemax={100}>
+                  <div className="h-full animate-pulse rounded-full bg-amber-500" style={{ width: `${progress(c.status)}%` }} />
+                </div>
+              </Link>
+            ))}
+          </Card>
+          <RunButton label="Generar ahora" />
+        </section>
+      )}
+
       <section className="space-y-2">
         <h2 className="text-sm font-semibold">Por revisar ({toReview.length})</h2>
         {toReview.length === 0 ? (
           <Card className="p-6 text-center">
-            <p className="font-medium">Todo al día</p>
-            <p className="text-sm text-muted-foreground">Cuando el pipeline termine un video nuevo aparecerá aquí.</p>
+            <p className="font-medium">{cooking.length ? "Aún no hay videos terminados" : "Todo al día"}</p>
+            <p className="text-sm text-muted-foreground">{cooking.length ? "Los de arriba se están preparando; aparecerán aquí al terminar." : "Cuando se termine un video nuevo aparecerá aquí."}</p>
           </Card>
         ) : (
           <Card className="divide-y">

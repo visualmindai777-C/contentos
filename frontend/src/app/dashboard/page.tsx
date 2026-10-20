@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { AutoRefresh } from "@/components/auto-refresh";
+import { PipelineFlow } from "@/components/pipeline-flow";
 import { Meter } from "@/components/meter";
 import { levelVariant } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +22,7 @@ export default async function DashboardPage() {
     ["Generados", stats.total],
     ["En cola", stats.queued],
     ["Con error", stats.failed],
-    ["Por revisar", stats.pending],
+    ["Por revisar", stats.review],
     ["Aprobados", stats.approved],
     ["Publicados", stats.published],
     ["Rechazados", stats.rejected],
@@ -29,11 +31,13 @@ export default async function DashboardPage() {
   return (
     <>
       <h1 className="text-xl font-semibold">Inicio</h1>
+      <AutoRefresh active={!!pipeline?.active || stats.queued > 0} />
+      <PipelineFlow stats={stats} generating={!!pipeline?.active} />
       <div className="grid gap-3 sm:grid-cols-2">
         <Link href="/review" className="rounded-lg border bg-card p-4 hover:bg-muted">
-          <p className="text-3xl font-semibold">{stats.pending}</p>
-          <p className="font-medium">{stats.pending === 1 ? "video por revisar" : "videos por revisar"}</p>
-          <p className="text-sm text-muted-foreground">{stats.pending ? "Toca para verlos y decidir →" : "Nada pendiente por ahora"}</p>
+          <p className="text-3xl font-semibold">{stats.review}</p>
+          <p className="font-medium">{stats.review === 1 ? "video listo para revisar" : "videos listos para revisar"}</p>
+          <p className="text-sm text-muted-foreground">{stats.review ? "Toca para verlos y decidir →" : "Aún no hay videos terminados"}</p>
         </Link>
         <Link href="/review" className={`rounded-lg border bg-card p-4 hover:bg-muted ${stats.failed ? "border-red-300" : ""}`}>
           <p className="text-3xl font-semibold">{stats.failed}</p>
