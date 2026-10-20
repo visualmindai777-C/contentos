@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Meter } from "@/components/meter";
 import { levelVariant } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
@@ -15,11 +16,11 @@ export default async function DashboardPage() {
   const last = pipeline?.last;
 
   const cards = [
-    ["Tendencias", stats.topics],
+    ["Temas", stats.topics],
     ["Generados", stats.total],
     ["En cola", stats.queued],
     ["Con error", stats.failed],
-    ["Pendientes", stats.pending],
+    ["Por revisar", stats.pending],
     ["Aprobados", stats.approved],
     ["Publicados", stats.published],
     ["Rechazados", stats.rejected],
@@ -27,7 +28,19 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <h1 className="text-xl font-semibold">Dashboard</h1>
+      <h1 className="text-xl font-semibold">Inicio</h1>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Link href="/review" className="rounded-lg border bg-card p-4 hover:bg-muted">
+          <p className="text-3xl font-semibold">{stats.pending}</p>
+          <p className="font-medium">{stats.pending === 1 ? "video por revisar" : "videos por revisar"}</p>
+          <p className="text-sm text-muted-foreground">{stats.pending ? "Toca para verlos y decidir →" : "Nada pendiente por ahora"}</p>
+        </Link>
+        <Link href="/review" className={`rounded-lg border bg-card p-4 hover:bg-muted ${stats.failed ? "border-red-300" : ""}`}>
+          <p className="text-3xl font-semibold">{stats.failed}</p>
+          <p className="font-medium">con error</p>
+          <p className="text-sm text-muted-foreground">{stats.failed ? "Toca para reintentar →" : "Todo funcionando"}</p>
+        </Link>
+      </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
         {cards.map(([label, value]) => (
           <Card key={label}>
@@ -41,7 +54,7 @@ export default async function DashboardPage() {
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Card>
-          <CardTitle>Pipeline (GitHub Actions)</CardTitle>
+          <CardTitle>Generación de videos</CardTitle>
           <CardContent className="space-y-2 text-sm">
             {!pipeline ? (
               <p className="text-muted-foreground">Sin datos (define WORKER_URL y revisa el Worker).</p>
@@ -51,10 +64,10 @@ export default async function DashboardPage() {
                 {last ? (
                   <p>
                     <Badge variant={last.conclusion === "success" ? "success" : last.conclusion === "failure" ? "danger" : "warning"}>
-                      {last.conclusion ?? "—"}
+                      {last.conclusion === "success" ? "Correcto" : last.conclusion === "failure" ? "Falló" : (last.conclusion ?? "—")}
                     </Badge>{" "}
                     {formatAgo(last.updated_at)} ·{" "}
-                    <a href={last.url} className="text-blue-700 hover:underline" target="_blank" rel="noreferrer">ver run</a>
+                    <a href={last.url} className="text-blue-700 hover:underline" target="_blank" rel="noreferrer">ver detalle</a>
                   </p>
                 ) : (
                   <p className="text-muted-foreground">Aún no hay runs.</p>
@@ -64,7 +77,7 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
         <Card>
-          <CardTitle>OpenRouter</CardTitle>
+          <CardTitle>IA de guiones</CardTitle>
           <CardContent className="space-y-2 text-sm">
             <Badge variant={levelVariant[a.llmLevel]}>{semaphore[a.llmLevel]}</Badge>
             <p>~{limits.llm_calls_today} / {limits.llm_daily_limit} llamadas hoy (estimado)</p>
@@ -73,7 +86,7 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
         <Card>
-          <CardTitle>R2 · almacenamiento</CardTitle>
+          <CardTitle>Almacenamiento de videos</CardTitle>
           <CardContent className="space-y-2 text-sm">
             <Badge variant={levelVariant[a.storageLevel]}>{Math.round(a.storage * 100)}% usado</Badge>
             <p>{formatMB(limits.estimated_storage_mb)} / {formatMB(limits.storage_limit_mb)}</p>
@@ -81,7 +94,7 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
         <Card>
-          <CardTitle>Supabase</CardTitle>
+          <CardTitle>Base de datos</CardTitle>
           <CardContent className="space-y-2 text-sm">
             <Badge variant="success">Conectado</Badge>
             <p>{limits.estimated_content_count} contenidos en base de datos</p>
@@ -90,7 +103,7 @@ export default async function DashboardPage() {
       </div>
 
       <Card>
-        <CardTitle>Advertencias de límites</CardTitle>
+        <CardTitle>Avisos de límites gratuitos</CardTitle>
         <CardContent className="text-sm">
           {a.alerts.length === 0 ? (
             <p className="text-muted-foreground">Sin advertencias activas.</p>

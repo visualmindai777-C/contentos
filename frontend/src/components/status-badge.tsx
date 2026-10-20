@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import type { Level } from "@/lib/limits";
+import { statusLabel } from "@/lib/labels";
 import type { Status } from "@/lib/types";
 
 const byStatus: Record<Status, "muted" | "info" | "warning" | "success" | "default" | "danger"> = {
@@ -14,4 +15,4 @@ const byStatus: Record<Status, "muted" | "info" | "warning" | "success" | "defau
 
 export const levelVariant: Record<Level, "success" | "warning" | "danger"> = { ok: "success", warn: "warning", danger: "danger" };
 
-export const StatusBadge = ({ status }: { status: Status }) => <Badge variant={byStatus[status]}>{status}</Badge>;
+export const StatusBadge = ({ status }: { status: Status }) => <Badge variant={byStatus[status]}>{statusLabel[status]}</Badge>;

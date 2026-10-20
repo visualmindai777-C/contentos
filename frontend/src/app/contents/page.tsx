@@ -5,8 +5,9 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { api } from "@/lib/api";
+import { statusLabel } from "@/lib/labels";
 import { STATUSES } from "@/lib/types";
-import { formatDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 
 const PAGE = 25;
 
@@ -34,11 +35,28 @@ export default async function ContentsPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <h1 className="text-xl font-semibold">Contents</h1>
-      <form className="flex flex-wrap gap-2">
+      <h1 className="text-xl font-semibold">Contenidos</h1>
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
+        {[["", "Todos"], ["generado", "Por revisar"], ["aprobado", "Aprobados"], ["publicado", "Publicados"], ["idea", "En cola"], ["rechazado", "Rechazados"]].map(([value, label]) => {
+          const q = new URLSearchParams();
+          if (value) q.set("status", value);
+          if (sp.project_id) q.set("project_id", sp.project_id);
+          const active = (status ?? "") === value;
+          return (
+            <Link
+              key={value}
+              href={`/contents?${q}`}
+              className={cn("inline-flex h-10 shrink-0 items-center rounded-full border px-4 text-sm", active ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}
+            >
+              {label}
+            </Link>
+          );
+        })}
+      </div>
+      <form className="hidden flex-wrap gap-2 md:flex">
         <Select name="status" defaultValue={status ?? ""}>
           <option value="">Todos los estados</option>
-          {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+          {STATUSES.map((s) => <option key={s} value={s}>{statusLabel[s]} ({s})</option>)}
         </Select>
         <Select name="project_id" defaultValue={sp.project_id ?? ""}>
           <option value="">Todos los proyectos</option>
@@ -47,6 +65,21 @@ export default async function ContentsPage({ searchParams }: { searchParams: Pro
         <Button type="submit" variant="outline">Filtrar</Button>
       </form>
 
+      <div className="space-y-2 md:hidden">
+        {items.map((c) => (
+          <Link key={c.id} href={`/contents/${c.id}`} prefetch={false} className="block rounded-lg border bg-card p-3 active:bg-muted">
+            <p className="line-clamp-2 font-medium">{c.title || "(pendiente de generar)"}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <StatusBadge status={c.status} />
+              {c.last_error && <Badge variant="danger">error</Badge>}
+              <span className="text-xs text-muted-foreground">{formatDate(c.created_at)}</span>
+            </div>
+          </Link>
+        ))}
+        {items.length === 0 && <p className="text-sm text-muted-foreground">Sin contenidos.</p>}
+      </div>
+
+      <div className="hidden md:block">
       <Table>
         <THead>
           <TR>
@@ -75,6 +108,7 @@ export default async function ContentsPage({ searchParams }: { searchParams: Pro
           {items.length === 0 && <TR><TD colSpan={5} className="text-muted-foreground">Sin contenidos.</TD></TR>}
         </TBody>
       </Table>
+      </div>
 
       <div className="flex gap-2">
         {page > 1 && <Link href={href(page - 1)} className={buttonVariants({ variant: "outline", size: "sm" })}>← Anterior</Link>}

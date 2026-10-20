@@ -239,3 +239,17 @@ def test_container_wires_all_contracts():
 def test_container_requires_credentials():
     with pytest.raises(RuntimeError, match="OPENROUTER_API_KEY"):
         build_providers(settings(openrouter_api_key=""))
+
+
+# --- Descubrimiento de tendencias a demanda ---
+def test_discovery_modes_widen_or_keep_the_project_scope():
+    from types import SimpleNamespace
+
+    from app.services.discovery import SUBREDDITS, context_for
+
+    project = SimpleNamespace(id=uuid.uuid4(), name="P", niche="ia", language="es", config={"subreddits": ["technology"], "keywords": ["gpt"]})
+    assert context_for(project, "nicho").config["subreddits"] == ["technology"]
+    viral = context_for(project, "viral")
+    assert viral.niche == "" and viral.config["subreddits"] == SUBREDDITS["viral"] and viral.config["keywords"] == []
+    assert context_for(project, "monetizable").config["subreddits"] == SUBREDDITS["monetizable"]
+    assert project.config["subreddits"] == ["technology"]  # el proyecto original no se modifica

@@ -10,7 +10,7 @@ export default async function ProjectsPage() {
 
   return (
     <>
-      <h1 className="text-xl font-semibold">Projects</h1>
+      <h1 className="text-xl font-semibold">Proyectos</h1>
       <Table>
         <THead>
           <TR><TH>Nombre</TH><TH>Slug</TH><TH>Nicho</TH><TH>Idioma</TH><TH>Estado</TH></TR>

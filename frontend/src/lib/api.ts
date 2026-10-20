@@ -72,6 +72,7 @@ export const api = {
 
   createProject: (b: { slug: string; name: string; niche: string }) => request<Project>("POST", "/projects", b),
   topics: (q: Query) => get<Topic[]>(`/topics${qs(q)}`),
+  discoverTopics: (b: { project_id: string; mode: string }) => request<{ found: number; added: number }>("POST", "/topics/discover", b),
   createTopic: (b: { project_id: string; topic: string }) => request<Topic>("POST", "/topics", b),
 
   contents: (q: Query) => get<ContentSummary[]>(`/contents${qs(q)}`),

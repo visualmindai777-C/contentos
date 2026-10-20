@@ -10,7 +10,7 @@ export default async function PublicationsPage() {
 
   return (
     <>
-      <h1 className="text-xl font-semibold">Publications</h1>
+      <h1 className="text-xl font-semibold">Publicaciones</h1>
       <Table>
         <THead>
           <TR><TH>Fecha</TH><TH>Plataforma</TH><TH>Contenido</TH><TH>Notas</TH></TR>

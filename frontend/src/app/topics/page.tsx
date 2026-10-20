@@ -1,6 +1,7 @@
 import { createContentFromTopic, createTopic } from "@/app/actions";
 import { ActionButton } from "@/components/action-button";
 import { ActionForm } from "@/components/action-form";
+import { TrendFinder } from "@/components/trend-finder";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
@@ -14,8 +15,10 @@ export default async function TopicsPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <h1 className="text-xl font-semibold">Topics</h1>
-      <form className="flex gap-2">
+      <h1 className="text-xl font-semibold">Temas</h1>
+      <TrendFinder projects={projects.map((p) => ({ id: p.id, name: p.name }))} />
+
+      <form className="hidden gap-2 md:flex">
         <Select name="project_id" defaultValue={project_id ?? ""}>
           <option value="">Todos los proyectos</option>
           {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -23,9 +26,23 @@ export default async function TopicsPage({ searchParams }: { searchParams: Promi
         <Button type="submit" variant="outline">Filtrar</Button>
       </form>
 
+      <div className="space-y-2 md:hidden">
+        {topics.map((t) => (
+          <div key={t.id} className="space-y-2 rounded-lg border bg-card p-3">
+            <p className="font-medium">{t.topic}</p>
+            <p className="text-xs text-muted-foreground">{t.source} · puntaje {t.score} · {formatDate(t.created_at)}</p>
+            <ActionButton className="w-full" variant="outline" action={createContentFromTopic.bind(null, t.project_id, t.id, t.topic)}>
+              Crear video con este tema
+            </ActionButton>
+          </div>
+        ))}
+        {topics.length === 0 && <p className="text-sm text-muted-foreground">Sin tendencias todavía: pulsa uno de los botones de arriba.</p>}
+      </div>
+
+      <div className="hidden md:block">
       <Table>
         <THead>
-          <TR><TH>Tema</TH><TH>Proyecto</TH><TH>Fuente</TH><TH>Score</TH><TH>Keywords</TH><TH>Fecha</TH><TH /></TR>
+          <TR><TH>Tema</TH><TH>Proyecto</TH><TH>Fuente</TH><TH>Puntaje</TH><TH>Keywords</TH><TH>Fecha</TH><TH /></TR>
         </THead>
         <TBody>
           {topics.map((t) => (
@@ -46,8 +63,9 @@ export default async function TopicsPage({ searchParams }: { searchParams: Promi
           {topics.length === 0 && <TR><TD colSpan={7} className="text-muted-foreground">Sin tendencias todavía.</TD></TR>}
         </TBody>
       </Table>
+      </div>
 
-      <ActionForm action={createTopic} submitLabel="Añadir tema">
+      <ActionForm action={createTopic} submitLabel="Añadir tema" className="flex-col items-stretch md:flex-row md:items-center">
         <Select name="project_id" required>
           {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </Select>

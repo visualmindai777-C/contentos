@@ -34,6 +34,16 @@ export async function retry(id: string) {
   return run(() => api.retry(id));
 }
 
+export async function discoverTrends(projectId: string, mode: string): Promise<string> {
+  try {
+    const { found, added } = await api.discoverTopics({ project_id: projectId, mode });
+    refresh();
+    return added ? `${added} tendencias nuevas (de ${found} encontradas)` : `Sin novedades: ya tenías las ${found} tendencias encontradas`;
+  } catch (e) {
+    return message(e);
+  }
+}
+
 export async function createContentFromTopic(projectId: string, topicId: string, title: string) {
   let id: string;
   try {
