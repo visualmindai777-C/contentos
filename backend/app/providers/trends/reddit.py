@@ -1,3 +1,4 @@
+import asyncio
 import xml.etree.ElementTree as ET
 
 import httpx
@@ -7,6 +8,7 @@ from app.core.types import ProjectContext, TrendCandidate
 from app.providers.http_client import http_request
 from app.providers.trends import extract_keywords
 
+SPACING = 1.5  # segundos entre subreddits
 ATOM = "{http://www.w3.org/2005/Atom}"
 # El JSON público de Reddit devuelve 403; el feed Atom de /top sí responde sin credenciales.
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
@@ -23,7 +25,9 @@ class RedditSource:
     async def fetch(self, project: ProjectContext, limit: int) -> list[TrendCandidate]:
         found: list[TrendCandidate] = []
         error: ProviderError | None = None
-        for sub in project.config.get("subreddits", []):
+        for i, sub in enumerate(project.config.get("subreddits", [])):
+            if i:
+                await asyncio.sleep(SPACING)  # Reddit responde 429 a ráfagas de peticiones sin credenciales
             try:
                 found += await self._top(sub, limit)
             except ProviderError as e:  # un subreddit caído no invalida el resto

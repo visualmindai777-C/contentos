@@ -17,6 +17,7 @@ from app.providers.image_pollinations import PollinationsProvider
 from app.providers.llm_openrouter import OpenRouterClient, missing_models
 from app.providers.storage_r2 import R2Storage
 from app.providers.trends.google import GoogleTrendsSource
+from app.providers.trends.hackernews import HackerNewsSource
 from app.providers.trends.reddit import RedditSource
 from app.providers.trends.wikipedia import WikipediaSource
 from app.providers.video_ffmpeg import FFmpegVideo
@@ -253,3 +254,10 @@ def test_discovery_modes_widen_or_keep_the_project_scope():
     assert viral.niche == "" and viral.config["subreddits"] == SUBREDDITS["viral"] and viral.config["keywords"] == []
     assert context_for(project, "monetizable").config["subreddits"] == SUBREDDITS["monetizable"]
     assert project.config["subreddits"] == ["technology"]  # el proyecto original no se modifica
+
+
+def test_hackernews_front_page_scores_by_points():
+    body = {"hits": [{"title": "Stripe raises prices", "points": 900}, {"title": "Show HN: tiny", "points": 12}, {"title": None, "points": 5}]}
+    out = run(HackerNewsSource(transport=transport(lambda r: httpx.Response(200, json=body))).fetch(PROJECT, 5))
+    assert [t.topic for t in out] == ["Stripe raises prices", "Show HN: tiny"]
+    assert out[0].score > out[1].score and out[0].source == "hackernews"

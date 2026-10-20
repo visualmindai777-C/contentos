@@ -9,7 +9,7 @@ from app.core.types import ProjectContext, TrendCandidate
 logger = logging.getLogger("app.pipeline")
 
 # Wikipedia y Google no distinguen nichos: pesan menos que una fuente que el proyecto eligió (subreddits).
-DEFAULT_WEIGHTS = {"reddit": 1.0, "google_trends": 0.9, "wikipedia": 0.5}
+DEFAULT_WEIGHTS = {"reddit": 1.0, "google_trends": 0.9, "wikipedia": 0.5, "hackernews": 0.8}
 RELEVANCE_BONUS = 10  # por palabra clave del proyecto presente en el tema (máx. 3)
 
 
