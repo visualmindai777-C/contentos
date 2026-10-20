@@ -1,6 +1,6 @@
 import { cache } from "react";
 import type {
-  Asset, Content, IdeaVerdict, ContentSummary, DashboardStats, PipelineStatus, Project, Publication, SystemConfig, SystemLimits, Topic,
+  Asset, Content, IdeaVerdict, SeriesPart, ContentSummary, DashboardStats, PipelineStatus, Project, Publication, SystemConfig, SystemLimits, Topic,
 } from "./types";
 
 // Solo se importa desde componentes de servidor y server actions: la API key nunca llega al navegador.
@@ -101,6 +101,8 @@ export const api = {
   approve: (id: string) => patch<Content>(`/contents/${id}/approve`),
   reject: (id: string) => patch<Content>(`/contents/${id}/reject`),
   regenerate: (id: string) => patch<Content>(`/contents/${id}/regenerate`),
+  nextPart: (id: string) => request<Content>("POST", `/contents/${id}/next-part`),
+  series: (id: string) => get<SeriesPart[]>(`/contents/${id}/series`),
   purge: (id: string) => request<{ deleted: boolean }>("DELETE", `/contents/${id}`),
   retry: (id: string) => patch<Content>(`/contents/${id}/retry`),
   publish: (id: string, b: { platform: string; published_at?: string; notes: string }) =>

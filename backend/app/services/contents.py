@@ -78,6 +78,23 @@ class ContentService:
         await self.session.commit()
         return content
 
+    async def next_part(self, content_id: UUID) -> Content:
+        """Crea la siguiente parte de una serie: un contenido en cola que continuará la historia de este."""
+        parent = await self.get(content_id)
+        if S(parent.status) not in (S.GENERADO, S.REVISADO, S.APROBADO, S.PUBLICADO) or not parent.script:
+            raise Conflict("Solo se puede continuar un contenido ya generado")
+        if await self.repo.has_child(content_id):
+            raise Conflict(f"Ya existe la parte {parent.part + 1} de esta serie")
+        child = await self.repo.save(Content(
+            project_id=parent.project_id, topic_id=parent.topic_id, parent_id=parent.id, part=parent.part + 1,
+        ))
+        await self.session.commit()
+        return child
+
+    async def series(self, content_id: UUID) -> Sequence[dict]:
+        await self.get(content_id)
+        return await self.repo.series(content_id)
+
     async def purge(self, content_id: UUID) -> None:
         """Borra un contenido rechazado: primero sus archivos de R2 y, solo si eso salió bien, las filas (assets y publicaciones en cascada)."""
         content = await self.get(content_id)

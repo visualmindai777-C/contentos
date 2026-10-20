@@ -26,6 +26,8 @@ export interface Topic {
 }
 
 export interface ContentSummary {
+  part: number;
+  parent_id?: string | null;
   id: string;
   project_id: string;
   topic_id: string | null;
@@ -114,4 +116,11 @@ export interface IdeaVerdict {
   title: string;
   improvement: string;
   content_id: string | null;
+}
+
+export interface SeriesPart {
+  id: string;
+  part: number;
+  title: string;
+  status: Status;
 }

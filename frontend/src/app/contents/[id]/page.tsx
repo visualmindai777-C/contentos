@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { approve, publish, purge, regenerate, reject, retry } from "@/app/actions";
+import { approve, createNextPart, publish, purge, regenerate, reject, retry } from "@/app/actions";
 import { ActionButton } from "@/components/action-button";
 import { ActionForm } from "@/components/action-form";
 import { CopyButton } from "@/components/copy-button";
@@ -7,6 +7,7 @@ import { Stepper } from "@/components/stepper";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import Link from "next/link";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/input";
 import { ApiError, api } from "@/lib/api";
@@ -27,12 +28,13 @@ const field = (label: string, value: string) =>
 
 export default async function ContentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  let content, assets, publications;
+  let content, assets, publications, series;
   try {
-    [content, assets, publications] = await Promise.all([
+    [content, assets, publications, series] = await Promise.all([
       api.content(id),
       api.assets(id),
       api.publications({ content_id: id }),
+      api.series(id),
     ]);
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) notFound();
@@ -49,12 +51,16 @@ export default async function ContentDetailPage({ params }: { params: Promise<{ 
   const canReject = ["idea", "guion", "generado", "revisado", "aprobado"].includes(status);
   const canRegenerate = !["idea", "publicado"].includes(status);
   const canPurge = status === "rechazado";
+  const isSeries = series.length > 1 || content.part > 1;
+  const hasNext = series.some((p) => p.part === content.part + 1);
+  const canContinue = ["generado", "revisado", "aprobado", "publicado"].includes(status) && !hasNext;
   const hasActions = canApprove || canReject || canRegenerate || canPurge;
   const caption = [content.caption, content.hashtags.join(" ")].filter(Boolean).join("\n\n");
 
   return (
     <div className="max-w-4xl space-y-4">
       <div className="space-y-1">
+        {isSeries && <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Serie · parte {content.part}</p>}
         <h1 className="text-xl font-semibold">{content.title || "(pendiente de generar)"}</h1>
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={status} />
@@ -92,6 +98,33 @@ export default async function ContentDetailPage({ params }: { params: Promise<{ 
             </a>
           )}
         </div>
+      )}
+
+      {isSeries && (
+        <Card>
+          <CardTitle>Partes de la serie</CardTitle>
+          <CardContent className="flex flex-wrap gap-2">
+            {series.map((p) => (
+              <Link
+                key={p.id}
+                href={`/contents/${p.id}`}
+                aria-current={p.id === id ? "page" : undefined}
+                className={cn(buttonVariants({ variant: p.id === id ? "default" : "outline", size: "sm" }), "gap-1")}
+              >
+                Parte {p.part} <StatusBadge status={p.status} />
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {canContinue && (
+        <Card>
+          <CardContent className="space-y-2">
+            <p className="text-sm text-muted-foreground">Continúa la historia con los mismos personajes: se crea la parte {content.part + 1} y entra en la cola.</p>
+            <ActionButton className="w-full" variant="outline" action={createNextPart.bind(null, id)}>Crear parte {content.part + 1}</ActionButton>
+          </CardContent>
+        </Card>
       )}
 
       {hasActions && (

@@ -333,3 +333,23 @@ def test_novela_uses_a_voice_per_character_one_image_per_scene_and_scene_duratio
     assert len(prompts) == 2 and "red hair" in prompts[0] and "Pixar" in prompts[0] and "bearded" in prompts[1]
     spec = specs[0]
     assert len(spec.images) == 2 and spec.durations == pytest.approx([2.6, 2.3])  # la pausa entre escenas se suma a la anterior and bundle.subtitles.startswith("1\n")
+
+
+def test_novela_next_part_prompt_carries_the_story_so_far_and_closes_on_the_last_part():
+    from app.agents.content_agent import ContentAgent
+    from app.core.types import LLMResponse
+
+    seen = []
+    reply = json.dumps({"title": "T (Parte 2)", "hook": "h", "script": NOVELA + " " + "palabra " * 30, "caption": "c", "hashtags": ["#a"], "cta": "x"})
+
+    class LLM:
+        async def complete(self, messages, *, json_mode=False, max_tokens=1200):
+            seen.append(messages[-1].content)
+            return LLMResponse(reply, "fake", "m", 5)
+
+    project = ProjectContext(uuid.uuid4(), "N", "general", "es", {"format": "novela", "series_parts": 3})
+    agent = ContentAgent(LLM())
+    run(agent.run(project, "tema", [], previous="PARTE 1 — Titulo\nLUCÍA: hola", part=2))
+    run(agent.run(project, "tema", [], previous="PARTE 1 — Titulo\nLUCÍA: hola", part=3))
+    assert "PARTE 1" in seen[0] and "(Parte 2)" in seen[0] and "cliffhanger" in seen[0]
+    assert "(Parte 3)" in seen[1] and "última parte" in seen[1]

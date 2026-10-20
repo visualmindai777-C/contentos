@@ -87,6 +87,16 @@ async def from_idea(data: IdeaRequest, svc: Ideas):
     return ok(await svc.evaluate(data.project_id, data.prompt))
 
 
+@router.post("/{content_id}/next-part", response_model=ApiResponse[ContentOut], status_code=201)
+async def next_part(content_id: UUID, svc: Contents):
+    return ok(await svc.next_part(content_id))
+
+
+@router.get("/{content_id}/series", response_model=ApiResponse[list[dict]])
+async def series(content_id: UUID, svc: Contents):
+    return ok(await svc.series(content_id))
+
+
 @router.delete("/{content_id}", response_model=ApiResponse[dict[str, bool]])
 async def purge(content_id: UUID, svc: Contents):
     await svc.purge(content_id)

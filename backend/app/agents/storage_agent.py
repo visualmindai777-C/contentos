@@ -29,6 +29,8 @@ class Job:
     topic: str
     keywords: list[str]
     draft: ContentDraft | None
+    part: int = 1
+    previous: str = ""  # guiones de las partes anteriores de la serie
 
 
 def _context(p: Project) -> ProjectContext:
@@ -59,6 +61,7 @@ class StorageAgent:
             if content is None:
                 raise LookupError(f"contenido {content_id} no existe")
             project = await ProjectRepository(s).get(content.project_id)
+            earlier = await ContentRepository(s).previous_scripts(content_id) if content.parent_id else []
             topic = await TopicRepository(s).get(content.topic_id) if content.topic_id else None
         # 'guion' sin guion es un estado incoherente: se rehace desde el LLM
         has_script = content.status == ContentStatus.GUION and bool(content.script)
@@ -66,7 +69,8 @@ class StorageAgent:
         return Job(
             content_id=content.id, status="guion" if has_script else "idea", project=_context(project),
             topic=topic.topic if topic else content.title, keywords=topic.keywords if topic else [],
-            draft=draft if has_script else None,
+            draft=draft if has_script else None, part=content.part,
+            previous="\n\n".join(f"PARTE {n} — {title}\n{script}" for n, title, script in earlier),
         )
 
     # --- tendencias ---

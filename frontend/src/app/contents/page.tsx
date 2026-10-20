@@ -68,7 +68,7 @@ export default async function ContentsPage({ searchParams }: { searchParams: Pro
       <div className="space-y-2 md:hidden">
         {items.map((c) => (
           <Link key={c.id} href={`/contents/${c.id}`} prefetch={false} className="block rounded-lg border bg-card p-3 active:bg-muted">
-            <p className="line-clamp-2 font-medium">{c.title || "(pendiente de generar)"}</p>
+            <p className="line-clamp-2 font-medium">{c.title || "(pendiente de generar)"}{c.part > 1 && <span className="ml-1 text-xs text-muted-foreground">· parte {c.part}</span>}</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <StatusBadge status={c.status} />
               {c.last_error && <Badge variant="danger">error</Badge>}

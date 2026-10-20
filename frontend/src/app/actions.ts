@@ -55,6 +55,17 @@ export async function runPipeline(): Promise<string> {
   }
 }
 
+export async function createNextPart(id: string) {
+  let next: string;
+  try {
+    next = (await api.nextPart(id)).id;
+  } catch (e) {
+    return message(e);
+  }
+  refresh();
+  redirect(`/contents/${next}`);
+}
+
 export async function purge(id: string) {
   try {
     await api.purge(id);

@@ -59,6 +59,8 @@ CREATE TABLE contents (
   llm_provider     text NOT NULL DEFAULT '',
   model_name       text NOT NULL DEFAULT '',
   tokens_used      integer NOT NULL DEFAULT 0,
+  parent_id        uuid REFERENCES contents(id) ON DELETE SET NULL,  -- parte anterior de la serie
+  part             integer NOT NULL DEFAULT 1,                       -- número de parte (mini novelas)
   last_error       text NOT NULL DEFAULT '',  -- fallo del pipeline; mientras no esté vacío, el contenido espera un reintento manual
   created_at       timestamptz NOT NULL DEFAULT now(),
   updated_at       timestamptz NOT NULL DEFAULT now()

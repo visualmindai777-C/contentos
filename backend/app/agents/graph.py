@@ -54,7 +54,10 @@ def build_graph(agents: Agents):
     async def load(state: PipelineState) -> dict:
         if content_id := state.get("content_id"):
             job = await storage.load_job(content_id)
-            update = {"project": job.project, "status": job.status, "topic": job.topic, "keywords": job.keywords}
+            update = {
+                "project": job.project, "status": job.status, "topic": job.topic, "keywords": job.keywords,
+                "part": job.part, "previous": job.previous,
+            }
             return update | ({"draft": job.draft} if job.draft else {})
         return {"has_unused": await storage.has_unused_topic(state["project"].id)}
 
@@ -72,7 +75,9 @@ def build_graph(agents: Agents):
         return {"content_id": content_id, "status": "idea", "topic": topic, "keywords": keywords}
 
     async def content(state: PipelineState) -> dict:
-        draft, llm = await agents.content.run(state["project"], state["topic"], state["keywords"])
+        draft, llm = await agents.content.run(
+            state["project"], state["topic"], state["keywords"], previous=state.get("previous", ""), part=state.get("part", 1),
+        )
         await storage.save_draft(state["content_id"], draft, llm)
         return {"draft": draft, "llm": llm, "status": "guion"}
 

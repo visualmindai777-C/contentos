@@ -67,6 +67,8 @@ class Content(Entity):
     model_name: Mapped[str] = mapped_column(default="")
     tokens_used: Mapped[int] = mapped_column(default=0)
     last_error: Mapped[str] = mapped_column(default="")
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(default=None)
+    part: Mapped[int] = mapped_column(default=1)
 
 
 class Asset(Entity):

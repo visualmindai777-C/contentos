@@ -62,6 +62,38 @@ Devuelve exactamente este JSON:
 5 a 8 hashtags."""
 
 
+NOVELA_NEXT_USER = """Proyecto: {name}. Idioma de los diálogos: {language}. Tono: {tone}.
+Estás escribiendo una SERIE de mini novelas para TikTok, Reels y Shorts. Esto es lo que ya pasó:
+
+{previous}
+
+Escribe la PARTE {part} (≈{words} palabras en total entre todos los diálogos, unos {seconds} segundos).
+Reglas:
+- Continúa EXACTAMENTE donde terminó la parte anterior, con los mismos personajes. Copia sus descripciones del bloque PERSONAJES tal cual, para que se vean igual.
+- La primera línea es un gancho que recapitula en 3 segundos lo último que pasó y engancha ("Anoche descubrí que...").
+- 4 escenas. Resuelve el final abierto anterior, y {ending}
+- Frases cortas y naturales (máx. 18 palabras por línea). Máx. 3 personajes, más un NARRADOR opcional.
+- Sin datos reales de personas ni marcas. Sin violencia gráfica ni contenido sexual.
+
+El campo "script" es texto con saltos de línea y este formato EXACTO:
+PERSONAJES
+NOMBRE | f | aspecto físico y ropa en inglés (el mismo de las partes anteriores)
+ESCENA | descripción visual en inglés de UN solo personaje, plano medio, con su aspecto completo, el lugar y la emoción
+NOMBRE: lo que dice
+(la letra f o m indica la voz: f femenina, m masculina)
+
+Devuelve exactamente este JSON:
+{{"title": "título de la serie que termine en (Parte {part}), máx. 70 caracteres",
+"hook": "la primera frase de esta parte",
+"script": "el guion con el formato indicado",
+"caption": "descripción del post, máx. 200 caracteres, con pregunta para comentar",
+"hashtags": ["#uno", "#dos"],
+"cta": "{cta}"}}
+5 a 8 hashtags."""
+
+DEFAULT_MAX_PARTS = 5
+
+
 class InvalidDraft(ProviderError):
     """El LLM respondió, pero no con el JSON esperado."""
 
@@ -106,16 +138,31 @@ class ContentAgent:
         self._llm = llm
         self._max_attempts = max_attempts
 
-    async def run(self, project: ProjectContext, topic: str, keywords: list[str]) -> tuple[ContentDraft, LLMResponse]:
+    async def run(
+        self, project: ProjectContext, topic: str, keywords: list[str], *, previous: str = "", part: int = 1,
+    ) -> tuple[ContentDraft, LLMResponse]:
         seconds = int(project.config.get("target_seconds", 40))
         novela = project.config.get("format") == "novela"
+        if novela and previous:
+            final = part >= int(project.config.get("series_parts", DEFAULT_MAX_PARTS))
+            prompt = NOVELA_NEXT_USER.format(
+                name=project.name, language=project.language, previous=previous[-6000:], part=part,
+                tone=project.config.get("tone", "dramático, intrigante y emocional"), seconds=seconds, words=seconds * WORDS_PER_SECOND,
+                ending="CIERRA la historia con un final satisfactorio: es la última parte." if final
+                else "termina con un nuevo final abierto (cliffhanger) que deje con ganas de la parte siguiente.",
+                cta="Gracias por seguir la serie" if final else "Sígueme para ver la siguiente parte",
+            )
+            messages = [Message("system", SYSTEM), Message("user", prompt)]
+            return await self._complete(messages, novela)
         prompt = (NOVELA_USER if novela else USER).format(
             name=project.name, niche=project.niche or "general", language=project.language,
             tone=project.config.get("tone", "curioso, directo y cercano"), topic=topic,
             keywords=", ".join(keywords) or "—", seconds=seconds, words=seconds * WORDS_PER_SECOND,
         )
         messages = [Message("system", SYSTEM), Message("user", prompt)]
+        return await self._complete(messages, novela)
 
+    async def _complete(self, messages: list[Message], novela: bool) -> tuple[ContentDraft, LLMResponse]:
         tokens, last = 0, InvalidDraft("sin intentos")
         for _ in range(self._max_attempts):
             response = await self._llm.complete(messages, json_mode=True, max_tokens=MAX_TOKENS)

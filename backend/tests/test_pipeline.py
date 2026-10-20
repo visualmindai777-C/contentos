@@ -358,3 +358,43 @@ def test_idea_viable_is_queued_and_unviable_is_not():
     good, bad, low, contents = run(scenario())
     assert good["viable"] and good["content_id"] and not bad["viable"] and bad["content_id"] is None and not low["viable"]
     assert [c.status for c in contents] == ["idea"] and contents[0].title == "Mi idea (Parte 1)"
+
+
+# --- Series (parte 2) ---
+def test_next_part_links_the_series_and_gives_the_pipeline_the_previous_script():
+    from app.core.errors import Conflict
+
+    async def scenario():
+        async with rig() as r:
+            await r.batch()
+            (parent,) = await r.contents()
+            async with r.sf() as s:
+                svc = ContentService(s)
+                child = await svc.next_part(parent.id)
+                with pytest.raises(Conflict):  # una sola continuación por parte
+                    await svc.next_part(parent.id)
+            async with r.sf() as s:
+                series = await ContentService(s).series(child.id)
+            job = await r.agents.storage.load_job(child.id)
+            return parent, child, series, job
+
+    parent, child, series, job = run(scenario())
+    assert (child.part, child.parent_id, child.status) == (2, parent.id, "idea")
+    assert [(p["part"], p["status"]) for p in series] == [(1, "generado"), (2, "idea")]
+    assert job.part == 2 and job.previous.startswith("PARTE 1") and "Segunda frase del guion" in job.previous
+
+
+def test_next_part_requires_a_generated_content():
+    from app.core.errors import Conflict
+
+    async def scenario():
+        async with rig() as r:
+            async with r.sf() as s:
+                idea = Content(project_id=r.pid)
+                s.add(idea)
+                await s.commit()
+            async with r.sf() as s:
+                with pytest.raises(Conflict):
+                    await ContentService(s).next_part(idea.id)
+
+    run(scenario())

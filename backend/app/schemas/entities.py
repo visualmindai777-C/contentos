@@ -75,6 +75,8 @@ class ContentOut(ORMModel):
     model_name: str
     tokens_used: int
     last_error: str
+    parent_id: UUID | None = None
+    part: int = 1
     created_at: datetime
     updated_at: datetime
 
@@ -92,6 +94,7 @@ class ContentSummary(ORMModel):
     tokens_used: int
     last_error: str
     duration_seconds: float
+    part: int = 1
     created_at: datetime
     updated_at: datetime
 

@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.orm import defer
 
 from app.core.enums import ContentStatus
@@ -49,6 +49,33 @@ class ContentRepository(Repository):
         ).where(Content.status.in_(QUEUE_STATUSES))
         pending, failed = (await self.session.execute(query)).one()
         return pending, failed
+
+    async def series(self, content_id: UUID) -> list[dict]:
+        """Todas las partes de la serie a la que pertenece el contenido: sus antecesores y sus descendientes."""
+        rows = await self.session.execute(text("""
+            WITH RECURSIVE up AS (
+              SELECT id, parent_id, part, title, status FROM contents WHERE id = :id
+              UNION ALL SELECT c.id, c.parent_id, c.part, c.title, c.status FROM contents c JOIN up ON c.id = up.parent_id
+            ), down AS (
+              SELECT id, parent_id, part, title, status FROM contents WHERE id = :id
+              UNION ALL SELECT c.id, c.parent_id, c.part, c.title, c.status FROM contents c JOIN down ON c.parent_id = down.id
+            )
+            SELECT id, part, title, status FROM up UNION SELECT id, part, title, status FROM down ORDER BY part
+        """), {"id": content_id})
+        return [{"id": r.id, "part": r.part, "title": r.title, "status": r.status} for r in rows]
+
+    async def previous_scripts(self, content_id: UUID) -> list[tuple[int, str, str]]:
+        """(parte, título, guion) de los antecesores, de la primera parte a la anterior."""
+        rows = await self.session.execute(text("""
+            WITH RECURSIVE up AS (
+              SELECT id, parent_id, part, title, script FROM contents WHERE id = :id
+              UNION ALL SELECT c.id, c.parent_id, c.part, c.title, c.script FROM contents c JOIN up ON c.id = up.parent_id
+            ) SELECT part, title, script FROM up WHERE id <> :id ORDER BY part
+        """), {"id": content_id})
+        return [(r.part, r.title, r.script) for r in rows]
+
+    async def has_child(self, content_id: UUID) -> bool:
+        return await self.session.scalar(select(select(Content.id).where(Content.parent_id == content_id).exists())) or False
 
     async def mark_failed(self, content_id: UUID, error: str) -> None:
         await self.session.execute(update(Content).where(Content.id == content_id).values(last_error=error[:500]))

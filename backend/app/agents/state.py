@@ -13,6 +13,8 @@ class PipelineState(TypedDict, total=False):
     status: str  # idea | guion | generado (refleja contents.status)
     topic: str
     keywords: list[str]
+    part: int
+    previous: str
     has_unused: bool
     candidates: list[TrendCandidate]
     draft: ContentDraft
