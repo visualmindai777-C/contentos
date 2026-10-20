@@ -13,7 +13,8 @@ engine = create_async_engine(
     _url,
     pool_size=3,
     max_overflow=2,
-    pool_pre_ping=True,
+    # Sin pre-ping: cada comprobación sería otra ida y vuelta a una BD lejana. pool_recycle renueva antes de que el pooler la cierre.
+    pool_recycle=240,
     connect_args={
         "statement_cache_size": 0,
         "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4()}__",

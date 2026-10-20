@@ -29,3 +29,21 @@ body {
   color: var(--foreground);
   font-family: system-ui, sans-serif;
 }
+
+/* Móvil: sin retardo ni destello al tocar, sin rebote que recarga la página, y movimiento reducido si el sistema lo pide */
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+a, button, summary, select, input {
+  touch-action: manipulation;
+}
+body {
+  overscroll-behavior-y: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

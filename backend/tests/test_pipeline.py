@@ -307,3 +307,23 @@ def test_purge_deletes_files_and_rows_only_for_rejected_contents():
 
     r, keys, left, gone = run(scenario())
     assert keys and not r.store.objects and not left and gone
+
+
+def test_dashboard_and_limits_come_from_a_single_consistent_snapshot():
+    from app.services.dashboard import DashboardService
+    from app.services.usage import UsageService
+
+    os.environ.setdefault("DATABASE_URL", URL)  # UsageService lee Settings, que exige la URL
+
+    async def scenario():
+        async with rig() as r:
+            await r.batch()
+            async with r.sf() as s:
+                stats = await DashboardService(s).stats()
+                limits = await UsageService(s).limits()
+                total = len((await s.scalars(select(Content))).all())
+            return stats, limits, total
+
+    stats, limits, total = run(scenario())
+    assert stats.total == total == limits.estimated_content_count and stats.pending >= 1
+    assert limits.estimated_tokens_used > 0 and limits.llm_calls_today >= 1  # los assets de prueba pesan bytes: se redondean a 0 MB

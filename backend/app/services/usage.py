@@ -3,8 +3,7 @@ from datetime import UTC, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import get_settings
-from app.repositories.assets import AssetRepository
-from app.repositories.contents import ContentRepository
+from app.repositories.metrics import MetricsRepository
 from app.schemas.entities import SystemConfig, SystemLimits
 
 DB_MB_PER_CONTENT = 0.007  # ~0,7 MB por cada 100 contenidos (texto + assets + índices)
@@ -12,17 +11,15 @@ DB_MB_PER_CONTENT = 0.007  # ~0,7 MB por cada 100 contenidos (texto + assets + �
 
 class UsageService:
     def __init__(self, session: AsyncSession):
-        self.contents = ContentRepository(session)
-        self.assets = AssetRepository(session)
+        self.metrics = MetricsRepository(session)
         self.settings = get_settings()
 
     async def limits(self) -> SystemLimits:
         s = self.settings
-        content_count = sum((await self.contents.count_by_status()).values())
-        tokens = await self.contents.tokens_total()
-        storage_mb = round(await self.assets.total_bytes() / 1_048_576, 2)
         day_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-        calls_today = await self.contents.llm_touched_since(day_start)  # cota superior: cualquier edición cuenta
+        m = await self.metrics.snapshot(day_start)
+        content_count, tokens, storage_mb = m.total, m.tokens, round(m.asset_bytes / 1_048_576, 2)
+        calls_today = m.llm_calls  # cota superior: cualquier edición cuenta
 
         checks = [
             ("R2", storage_mb, s.r2_limit_mb, "MB", "borra rechazados o migra a R2 de pago"),

@@ -25,7 +25,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const res = await fetch(BASE + path, {
     method,
     cache: "no-store",
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(20_000),
     headers: { "content-type": "application/json", "x-api-key": process.env.API_KEY ?? "" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
@@ -62,15 +62,33 @@ async function pipelineStatus(): Promise<PipelineStatus | null> {
   }
 }
 
+// Datos que casi no cambian: se reutilizan unos segundos entre peticiones (el aislado de Workers sobrevive entre ellas)
+// para no cruzar de nuevo portal → API → BD en cada pantalla.
+function memo<T>(fn: () => Promise<T>, ttlMs: number) {
+  let hit: { at: number; value: T } | undefined;
+  const read = async () => {
+    if (hit && Date.now() - hit.at < ttlMs) return hit.value;
+    const value = await fn();
+    hit = { at: Date.now(), value };
+    return value;
+  };
+  return Object.assign(read, { reset: () => void (hit = undefined) });
+}
+
+const projectsMemo = memo(() => get<Project[]>("/projects"), 60_000);
+
 // cache() de React deduplica llamadas repetidas dentro de una misma petición (layout + página).
 export const api = {
   stats: cache(() => get<DashboardStats>("/dashboard/stats")),
-  limits: cache(() => get<SystemLimits>("/system/limits")),
-  projects: cache(() => get<Project[]>("/projects")),
+  limits: cache(memo(() => get<SystemLimits>("/system/limits"), 30_000)),
+  projects: cache(projectsMemo),
   config: () => get<SystemConfig>("/system/config"),
   pipeline: cache(pipelineStatus),
 
-  createProject: (b: { slug: string; name: string; niche: string }) => request<Project>("POST", "/projects", b),
+  createProject: async (b: { slug: string; name: string; niche: string }) => {
+    projectsMemo.reset();
+    return request<Project>("POST", "/projects", b);
+  },
   topics: (q: Query) => get<Topic[]>(`/topics${qs(q)}`),
   discoverTopics: (b: { project_id: string; mode: string }) => request<{ found: number; added: number }>("POST", "/topics/discover", b),
   createTopic: (b: { project_id: string; topic: string }) => request<Topic>("POST", "/topics", b),

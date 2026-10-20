@@ -1,30 +1,22 @@
+from datetime import UTC, datetime
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.enums import ContentStatus as S
 from app.repositories.contents import ContentRepository
-from app.repositories.topics import TopicRepository
+from app.repositories.metrics import MetricsRepository
 from app.schemas.entities import DashboardStats, QueueStatus
-
-PENDING = (S.IDEA, S.GUION, S.GENERADO, S.REVISADO)
 
 
 class DashboardService:
     def __init__(self, session: AsyncSession):
         self.contents = ContentRepository(session)
-        self.topics = TopicRepository(session)
+        self.metrics = MetricsRepository(session)
 
     async def stats(self) -> DashboardStats:
-        counts = await self.contents.count_by_status()
-        queued, failed = await self.contents.count_queue()
+        m = await self.metrics.snapshot(datetime.now(UTC))
         return DashboardStats(
-            total=sum(counts.values()),
-            approved=counts.get(S.APROBADO, 0),
-            published=counts.get(S.PUBLICADO, 0),
-            rejected=counts.get(S.RECHAZADO, 0),
-            pending=sum(counts.get(s, 0) for s in PENDING),
-            topics=await self.topics.count(),
-            queued=queued,
-            failed=failed,
+            total=m.total, approved=m.approved, published=m.published, rejected=m.rejected,
+            pending=m.pending, topics=m.topics, queued=m.queued, failed=m.failed,
         )
 
     async def queue(self) -> QueueStatus:
