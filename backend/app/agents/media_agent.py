@@ -13,6 +13,7 @@ from app.core.types import ContentDraft, GeneratedImage, MediaBundle, Narration,
 
 logger = logging.getLogger("app.pipeline")
 
+BRAND_DIR = Path(__file__).resolve().parent.parent / "assets" / "brand"  # kit de marca visualmindai777
 IMAGE_SIZE = (768, 1024)  # el vídeo sale en 1080x1920; a esta resolución Pollinations va más rápido
 MIN_IMAGES = 2
 DEFAULT_CROP_BOTTOM = 0.05  # Pollinations anónimo estampa su logo en el ~3 % inferior; nologo=true se ignora sin clave
@@ -75,7 +76,7 @@ class MediaAgent:
 
         video = await self._video.render(VideoSpec(
             images=paths, audio=audio, segments=narration.segments, output=workdir / "video.mp4",
-            crop_bottom=float(cfg.get("image_crop_bottom", DEFAULT_CROP_BOTTOM)),
+            crop_bottom=float(cfg.get("image_crop_bottom", DEFAULT_CROP_BOTTOM)), **self._brand(cfg),
         ))
         return MediaBundle(video=video, images=paths, subtitles=to_srt(chunk_segments(narration.segments)))
 
@@ -98,7 +99,7 @@ class MediaAgent:
         durations = self._merge_durations(scene_seconds, len(prompts), len(paths), images)
         video = await self._video.render(VideoSpec(
             images=paths, audio=audio, segments=narration.segments, output=workdir / "video.mp4",
-            durations=durations, crop_bottom=float(cfg.get("image_crop_bottom", DEFAULT_CROP_BOTTOM)),
+            durations=durations, crop_bottom=float(cfg.get("image_crop_bottom", DEFAULT_CROP_BOTTOM)), **self._brand(cfg),
         ))
         return MediaBundle(video=video, images=paths, subtitles=to_srt(chunk_segments(narration.segments)))
 
@@ -150,6 +151,14 @@ class MediaAgent:
             path.write_bytes(image.data)
             paths.append(path)
         return paths
+
+    @staticmethod
+    def _brand(cfg: dict) -> dict:
+        """Marca de agua y tarjeta final del canal. Por defecto solo en novelas; `"brand": false` la quita."""
+        if not cfg.get("brand", cfg.get("format") == "novela"):
+            return {}
+        watermark, outro = BRAND_DIR / "watermark.png", BRAND_DIR / "outro.png"
+        return {"watermark": watermark if watermark.exists() else None, "outro": outro if outro.exists() else None}
 
     async def _generate_all(self, prompts: list[str], seeds: list[int] | None = None) -> list[GeneratedImage]:
         images = []

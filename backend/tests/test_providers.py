@@ -224,6 +224,14 @@ def test_ffmpeg_renders_vertical_video(tmp_path):
     video = run(FFmpegVideo().render(VideoSpec(images, audio, segments, tmp_path / "out" / "video.mp4", crop_bottom=0.05)))
     assert video.path.exists() and video.file_size > 0 and abs(video.duration - 3) < 0.3
 
+    from app.agents.media_agent import BRAND_DIR
+
+    branded = run(FFmpegVideo().render(VideoSpec(
+        images, audio, segments, tmp_path / "brand" / "video.mp4", crop_bottom=0.05,
+        watermark=BRAND_DIR / "watermark.png", outro=BRAND_DIR / "outro.png", outro_seconds=1.5,
+    )))
+    assert abs(branded.duration - 4.5) < 0.3  # 3 s de narración + 1,5 s de tarjeta final
+
 
 # --- Container ---
 def settings(**kw):

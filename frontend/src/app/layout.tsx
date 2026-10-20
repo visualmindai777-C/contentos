@@ -6,8 +6,8 @@ import { BottomNav, Sidebar } from "@/components/nav";
 import { api, backendHealthy } from "@/lib/api";
 import "./globals.css";
 
-export const metadata: Metadata = { title: "Content OS" };
-export const viewport: Viewport = { themeColor: "#ffffff" };
+export const metadata: Metadata = { title: "VisualMind AI·777", applicationName: "VisualMind AI·777" };
+export const viewport: Viewport = { themeColor: "#071430" };
 
 // Cabecera y globo de "Revisar" cargan en streaming: la página ya se ve y reacciona mientras llegan.
 async function HeaderLoader() {
@@ -30,7 +30,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <div className="flex min-h-screen flex-col md:flex-row">
           <aside className="hidden bg-card md:flex md:w-56 md:shrink-0 md:flex-col md:border-r">
-            <div className="px-4 py-3 font-semibold">Content OS</div>
+            <div className="bg-primary px-4 py-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo-horizontal.png" alt="VisualMind AI·777" width={720} height={102} className="h-8 w-auto" />
+            </div>
             <Sidebar />
             <div className="mt-auto p-3">
               <Suspense>
@@ -39,7 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
           </aside>
           <div className="min-w-0 flex-1">
-            <Suspense fallback={<header className="flex h-12 items-center border-b bg-card px-4 font-semibold md:hidden">Content OS</header>}>
+            <Suspense fallback={<header className="h-12 border-b bg-primary md:hidden" />}>
               <HeaderLoader />
             </Suspense>
             <main className="space-y-4 p-4 pb-28 md:p-6 md:pb-6">{children}</main>

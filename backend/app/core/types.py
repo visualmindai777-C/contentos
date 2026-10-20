@@ -88,6 +88,9 @@ class VideoSpec:
     width: int = 1080
     height: int = 1920
     fps: int = 30
+    watermark: Path | None = None  # ícono de marca (PNG con transparencia), arriba a la derecha, fuera de la zona de la interfaz
+    outro: Path | None = None  # tarjeta final 9:16 de la marca
+    outro_seconds: float = 2.0
     durations: list[float] | None = None  # segundos que ocupa cada imagen (novela); por defecto se reparten a partes iguales
     crop_bottom: float = 0.0  # fracción inferior que se recorta de cada imagen (marcas de agua de proveedores gratuitos)
 

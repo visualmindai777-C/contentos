@@ -6,8 +6,10 @@ import type { SystemLimits } from "@/lib/types";
 export function Header({ healthy, limits }: { healthy: boolean; limits: SystemLimits | null }) {
   const a = limits ? assess(limits) : null;
   return (
-    <header className="flex items-center gap-2 border-b bg-card px-4 py-2.5">
-      <span className="mr-auto font-semibold md:hidden">Content OS</span>
+    <header className="flex items-center gap-2 border-b border-brand/30 bg-primary px-4 py-2.5 text-primary-foreground">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/logo-horizontal.png" alt="VisualMind AI·777" width={720} height={102} className="mr-auto h-7 w-auto md:hidden" />
+      <span className="mr-auto hidden text-sm text-primary-foreground/70 md:block">Panel de producción</span>
       <Badge variant={healthy ? "success" : "danger"}>{healthy ? "Conectado" : "Sin conexión"}</Badge>
       {a && limits && (
         <>

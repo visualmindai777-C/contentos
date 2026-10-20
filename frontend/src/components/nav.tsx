@@ -35,7 +35,7 @@ export function Sidebar() {
         <Link
           key={href}
           href={href}
-          className={cn("rounded-md px-3 py-1.5 text-sm hover:bg-muted", pathname.startsWith(href) && "bg-muted font-medium")}
+          className={cn("rounded-md px-3 py-1.5 text-sm hover:bg-muted", pathname.startsWith(href) && "bg-brand-soft font-medium")}
         >
           {label}
         </Link>
@@ -60,7 +60,7 @@ export function BottomNav({ badge }: { badge?: number }) {
             aria-current={active ? "page" : undefined}
             className={cn("relative flex h-16 flex-col items-center justify-center gap-0.5 text-[11px]", active ? "font-semibold text-foreground" : "text-muted-foreground")}
           >
-            <span className={cn("rounded-full px-4 py-1", active && "bg-muted")}>
+            <span className={cn("rounded-full px-4 py-1", active && "bg-brand-soft")}>
               <Icon />
             </span>
             {label}

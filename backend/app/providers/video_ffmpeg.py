@@ -69,17 +69,30 @@ class FFmpegVideo:
             for i in range(n)
         ]
         joined = "".join(f"[v{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=0[cat]"
-        subs = (
-            f"[cat]subtitles={srt.name}:force_style='{SUBTITLE_STYLE}',"
-            "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p[out]"
-        )
-
+        tail = [f"[cat]subtitles={srt.name}:force_style='{SUBTITLE_STYLE}'[body0]"]
         cmd = ["ffmpeg", "-y", "-loglevel", "error"]
         for image in spec.images:
             cmd += ["-i", str(image.resolve())]
+        cmd += ["-i", str(audio)]
+        nxt, body = n + 1, "body0"
+        if spec.watermark:
+            cmd += ["-i", str(spec.watermark.resolve())]
+            tail += [f"[{nxt}:v]scale=150:-1,format=rgba,colorchannelmixer=aa=0.85[wm]", f"[{body}][wm]overlay=W-w-40:190[body1]"]
+            nxt, body = nxt + 1, "body1"
+        total = duration
+        audio_map = f"{n}:a"
+        if spec.outro:
+            cmd += ["-loop", "1", "-framerate", str(spec.fps), "-t", f"{spec.outro_seconds}", "-i", str(spec.outro.resolve())]
+            tail += [
+                f"[{nxt}:v]scale={w}:{h},setsar=1,fps={spec.fps},format=yuv420p[vo]",
+                f"[{body}]format=yuv420p,setsar=1[bd]", "[bd][vo]concat=n=2:v=1:a=0[body2]",
+                f"[{n}:a]apad=pad_dur={spec.outro_seconds}[aout]",
+            ]
+            body, audio_map, total = "body2", "[aout]", duration + spec.outro_seconds
+        tail.append(f"[{body}]scale=out_color_matrix=bt709:out_range=tv,format=yuv420p[out]")
         cmd += [
-            "-i", str(audio), "-filter_complex", ";".join([*clips, joined, subs]),
-            "-map", "[out]", "-map", f"{n}:a", "-t", f"{duration:.2f}",
+            "-filter_complex", ";".join([*clips, joined, *tail]),
+            "-map", "[out]", "-map", audio_map, "-t", f"{total:.2f}",
             "-c:v", "libx264", "-preset", self._preset, "-crf", str(self._crf), "-pix_fmt", "yuv420p",
             "-color_range", "tv", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709",
             "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(output),

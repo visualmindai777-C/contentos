@@ -12,3 +12,6 @@ node_modules/
 .dev.vars
 
 *.tsbuildinfo
+
+# Kit de marca original (los recursos usados se copian a frontend/public y backend/app/assets/brand)
+visualmindai777-marca*
