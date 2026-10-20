@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 
 const items = [
+  ["/idea", "Mi idea", "Pega un prompt y la IA verifica si es viable"],
   ["/publications", "Publicaciones", "Lo que ya publicaste y dónde"],
   ["/projects", "Proyectos", "Nichos y configuración"],
   ["/settings", "Ajustes", "Límites gratuitos y proveedores"],

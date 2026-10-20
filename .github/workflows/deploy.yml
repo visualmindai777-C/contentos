@@ -115,11 +115,12 @@ jobs:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           WORKER_URL: ${{ steps.urls.outputs.worker_url }}
           SERVICE_ID: ${{ steps.svc.outputs.id }}
         run: |
           : "${DATABASE_URL:?Falta DATABASE_URL}" "${API_KEY:?Falta API_KEY}" "${ARTIFACT_SECRET:?Falta ARTIFACT_SECRET}" "${R2_SECRET_ACCESS_KEY:?Falta R2_SECRET_ACCESS_KEY}"
-          jq -n --arg d "$DATABASE_URL" --arg a "$API_KEY" --arg s "$ARTIFACT_SECRET" --arg w "${WORKER_URL}/artifacts" --arg ra "$R2_ACCOUNT_ID" --arg rk "$R2_ACCESS_KEY_ID" --arg rs "$R2_SECRET_ACCESS_KEY" '[{key:"DATABASE_URL",value:$d},{key:"API_KEY",value:$a},{key:"ARTIFACT_SECRET",value:$s},{key:"ASSETS_BASE_URL",value:$w},{key:"PORT",value:"7860"},{key:"R2_ACCOUNT_ID",value:$ra},{key:"R2_ACCESS_KEY_ID",value:$rk},{key:"R2_SECRET_ACCESS_KEY",value:$rs}]' |
+          jq -n --arg d "$DATABASE_URL" --arg a "$API_KEY" --arg s "$ARTIFACT_SECRET" --arg w "${WORKER_URL}/artifacts" --arg ra "$R2_ACCOUNT_ID" --arg rk "$R2_ACCESS_KEY_ID" --arg rs "$R2_SECRET_ACCESS_KEY" --arg ok "$OPENROUTER_API_KEY" '[{key:"DATABASE_URL",value:$d},{key:"API_KEY",value:$a},{key:"ARTIFACT_SECRET",value:$s},{key:"ASSETS_BASE_URL",value:$w},{key:"PORT",value:"7860"},{key:"R2_ACCOUNT_ID",value:$ra},{key:"R2_ACCESS_KEY_ID",value:$rk},{key:"R2_SECRET_ACCESS_KEY",value:$rs},{key:"OPENROUTER_API_KEY",value:$ok}]' |
           curl -fsS -X PUT "https://api.render.com/v1/services/${SERVICE_ID}/env-vars"             -H "Authorization: Bearer $RENDER_API_KEY" -H "Content-Type: application/json" -d @- > /dev/null
           echo "variables cargadas"
 

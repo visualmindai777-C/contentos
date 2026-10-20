@@ -1,6 +1,6 @@
 import { cache } from "react";
 import type {
-  Asset, Content, ContentSummary, DashboardStats, PipelineStatus, Project, Publication, SystemConfig, SystemLimits, Topic,
+  Asset, Content, IdeaVerdict, ContentSummary, DashboardStats, PipelineStatus, Project, Publication, SystemConfig, SystemLimits, Topic,
 } from "./types";
 
 // Solo se importa desde componentes de servidor y server actions: la API key nunca llega al navegador.
@@ -91,6 +91,7 @@ export const api = {
   },
   topics: (q: Query) => get<Topic[]>(`/topics${qs(q)}`),
   discoverTopics: (b: { project_id: string; mode: string }) => request<{ found: number; added: number }>("POST", "/topics/discover", b),
+  evaluateIdea: (b: { project_id: string; prompt: string }) => request<IdeaVerdict>("POST", "/contents/from-idea", b),
   createTopic: (b: { project_id: string; topic: string }) => request<Topic>("POST", "/topics", b),
 
   contents: (q: Query) => get<ContentSummary[]>(`/contents${qs(q)}`),

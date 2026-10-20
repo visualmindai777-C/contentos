@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ApiError, api } from "@/lib/api";
+import type { IdeaVerdict } from "@/lib/types";
 
 // Devuelven el mensaje de error del backend (o undefined/"" si todo fue bien): en producción
 // Next oculta los errores lanzados desde server actions.
@@ -24,6 +25,16 @@ export async function approve(id: string) {
 
 export async function reject(id: string) {
   return run(() => api.reject(id));
+}
+
+export async function evaluateIdea(projectId: string, prompt: string): Promise<{ error?: string; verdict?: IdeaVerdict }> {
+  try {
+    const verdict = await api.evaluateIdea({ project_id: projectId, prompt });
+    refresh();
+    return { verdict };
+  } catch (e) {
+    return { error: message(e) };
+  }
 }
 
 export async function runPipeline(): Promise<string> {

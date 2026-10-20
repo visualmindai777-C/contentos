@@ -29,6 +29,10 @@ class Conflict(AppError):
     status_code = 409
 
 
+class TooManyRequests(AppError):
+    status_code = 429
+
+
 def _fail(message: str, status_code: int) -> JSONResponse:
     return JSONResponse({"success": False, "error": message}, status_code=status_code)
 

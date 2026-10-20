@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 const sidebar = [
   ["/dashboard", "Inicio"],
+  ["/idea", "Mi idea"],
   ["/review", "Revisar"],
   ["/contents", "Contenidos"],
   ["/publications", "Publicaciones"],
@@ -24,7 +25,7 @@ const tabs = [
 ] as const;
 
 // "Más" también resalta en las páginas que cuelgan de él
-const moreRoutes = ["/mas", "/projects", "/publications", "/settings"];
+const moreRoutes = ["/mas", "/idea", "/projects", "/publications", "/settings"];
 
 export function Sidebar() {
   const pathname = usePathname();

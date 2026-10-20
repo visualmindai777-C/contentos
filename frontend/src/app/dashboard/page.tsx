@@ -32,6 +32,10 @@ export default async function DashboardPage() {
     <>
       <h1 className="text-xl font-semibold">Inicio</h1>
       <AutoRefresh active={!!pipeline?.active || stats.queued > 0} />
+      <Link href="/idea" className="block rounded-lg border bg-card p-4 hover:bg-muted">
+        <p className="font-semibold">Crear desde mi idea</p>
+        <p className="text-sm text-muted-foreground">Pega un prompt: la IA verifica si es viable y, si lo es, lo crea. →</p>
+      </Link>
       <PipelineFlow stats={stats} generating={!!pipeline?.active} />
       <div className="grid gap-3 sm:grid-cols-2">
         <Link href="/review" className="rounded-lg border bg-card p-4 hover:bg-muted">

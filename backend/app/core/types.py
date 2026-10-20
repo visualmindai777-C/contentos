@@ -88,6 +88,7 @@ class VideoSpec:
     width: int = 1080
     height: int = 1920
     fps: int = 30
+    durations: list[float] | None = None  # segundos que ocupa cada imagen (novela); por defecto se reparten a partes iguales
     crop_bottom: float = 0.0  # fracción inferior que se recorta de cada imagen (marcas de agua de proveedores gratuitos)
 
 

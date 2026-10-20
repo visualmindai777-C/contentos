@@ -213,7 +213,7 @@ def test_ffmpeg_renders_vertical_video(tmp_path):
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", *args], check=True)
 
     images = []
-    for i, color in enumerate(("red", "blue")):
+    for i, color in enumerate(("red", "blue", "green", "yellow")):  # una imagen por cada movimiento de cámara
         path = tmp_path / f"i{i}.png"
         ff("-f", "lavfi", "-i", f"color=c={color}:s=540x960", "-frames:v", "1", str(path))
         images.append(path)
@@ -261,3 +261,75 @@ def test_hackernews_front_page_scores_by_points():
     out = run(HackerNewsSource(transport=transport(lambda r: httpx.Response(200, json=body))).fetch(PROJECT, 5))
     assert [t.topic for t in out] == ["Stripe raises prices", "Show HN: tiny"]
     assert out[0].score > out[1].score and out[0].source == "hackernews"
+
+
+# --- Mini novela ---
+NOVELA = """PERSONAJES
+LUCÍA | f | young woman, short red hair, turquoise t-shirt
+MARCOS | m | bearded man, gray shirt
+ESCENA | Lucía in a cozy kitchen at night, shocked face, medium shot
+LUCÍA: ¿Me mentiste todo este tiempo?
+MARCOS (nervioso): Puedo explicarlo, te lo juro.
+ESCENA | Marcos on the balcony, guilty face, medium shot
+NARRADOR: Esa noche, todo cambió.
+MARCOS: No era quien creías.
+"""
+
+
+def test_screenplay_parses_characters_scenes_and_speakers():
+    from app.core.screenplay import parse_screenplay
+
+    play = parse_screenplay(NOVELA)
+    assert play is not None and set(play.characters) == {"LUCÍA", "MARCOS"} and play.characters["MARCOS"].gender == "m"
+    assert [len(s.lines) for s in play.scenes] == [2, 2]
+    assert [l.speaker for l in play.lines] == ["LUCÍA", "MARCOS", "NARRADOR", "MARCOS"]
+    assert parse_screenplay("Un guion normal sin formato de novela. " * 10) is None
+
+
+def _wav(seconds: float) -> bytes:
+    import io
+    import wave
+
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1), w.setsampwidth(2), w.setframerate(24_000)
+        w.writeframes(b"\x00\x00" * int(24_000 * seconds))
+    return buf.getvalue()
+
+
+def test_join_wavs_adds_gaps_and_reports_start_times():
+    from app.core.audio import join_wavs, wav_seconds
+
+    data, starts = join_wavs([_wav(1.0), _wav(2.0), _wav(0.5)], gap=0.25)
+    assert starts == pytest.approx([0.0, 1.25, 3.5]) and wav_seconds(data) == pytest.approx(4.0)
+
+
+def test_novela_uses_a_voice_per_character_one_image_per_scene_and_scene_durations(tmp_path):
+    from app.agents.media_agent import MediaAgent
+    from app.core.types import ContentDraft, GeneratedImage, Narration, RenderedVideo
+
+    voices, prompts, specs = [], [], []
+
+    class TTS:
+        async def synthesize(self, text, *, voice, lang):
+            voices.append(voice)
+            return Narration(_wav(1.0), "audio/wav", 1.0, [Segment(text, 0.0, 1.0)])
+
+    class Images:
+        async def generate(self, prompt, *, width, height, seed):
+            prompts.append(prompt)
+            return GeneratedImage(b"\xff\xd8jpg", "image/jpeg")
+
+    class Video:
+        async def render(self, spec):
+            specs.append(spec)
+            return RenderedVideo(spec.output, 5.0, 1)
+
+    project = ProjectContext(uuid.uuid4(), "N", "general", "es", {"format": "novela"})
+    draft = ContentDraft("T (Parte 1)", "h", NOVELA, "c", ["#a"], "cta")
+    bundle = run(MediaAgent(TTS(), Images(), Video(), voice="ef_dora", lang="e").run(project, "tema", draft, tmp_path))
+
+    assert voices == ["ef_dora", "em_alex", "em_alex", "em_alex"]  # Lucía f, Marcos m, narrador y Marcos
+    assert len(prompts) == 2 and "red hair" in prompts[0] and "Pixar" in prompts[0] and "bearded" in prompts[1]
+    spec = specs[0]
+    assert len(spec.images) == 2 and spec.durations == pytest.approx([2.6, 2.3])  # la pausa entre escenas se suma a la anterior and bundle.subtitles.startswith("1\n")

@@ -5,9 +5,11 @@ import re
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
+from app.core.audio import join_wavs
 from app.core.interfaces import ImageProvider, ProviderError, RateLimitError, TTSProvider, VideoProvider
+from app.core.screenplay import NARRATOR, Screenplay, parse_screenplay
 from app.core.subtitles import chunk_segments, to_srt
-from app.core.types import ContentDraft, GeneratedImage, MediaBundle, ProjectContext, VideoSpec
+from app.core.types import ContentDraft, GeneratedImage, MediaBundle, Narration, ProjectContext, Segment, VideoSpec
 
 logger = logging.getLogger("app.pipeline")
 
@@ -17,6 +19,13 @@ DEFAULT_CROP_BOTTOM = 0.05  # Pollinations anónimo estampa su logo en el ~3 % i
 DEFAULT_WAIT = 45.0  # Pollinations anónimo: 1 imagen cada ~45 s por IP
 TRANSIENT_WAIT = 5.0  # timeouts y errores de red del proveedor
 MAX_WAIT = 120.0
+PIXAR_STYLE = (
+    "3D animated movie style, Pixar-like cartoon character, big expressive eyes, soft studio lighting, "
+    "vibrant colors, smooth shading, medium shot, no text, no watermark"
+)
+DEFAULT_VOICES = {"f": "ef_dora", "m": "em_alex", NARRATOR: "em_alex"}  # voces de Kokoro en español
+LINE_GAP = 0.3  # pausa entre líneas de diálogo, en segundos
+MAX_SCENES = 5
 DEFAULT_STYLE = "cinematic digital illustration, dramatic lighting, highly detailed, natural proportions, no text, no watermark"
 
 _EMOJI = re.compile("[\U0001f300-\U0001faff☀-➿️]")
@@ -51,6 +60,9 @@ class MediaAgent:
 
     async def run(self, project: ProjectContext, topic: str, draft: ContentDraft, workdir: Path) -> MediaBundle:
         cfg = project.config
+        play = parse_screenplay(draft.script) if cfg.get("format") == "novela" else None
+        if play:
+            return await self._run_novela(project, play, workdir)
         narration, images = await asyncio.gather(
             self._tts.synthesize(
                 clean_for_speech(draft.script), voice=cfg.get("tts_voice", self._voice), lang=cfg.get("tts_lang", self._lang)
@@ -59,11 +71,7 @@ class MediaAgent:
         )
         audio = workdir / "audio.wav"
         audio.write_bytes(narration.audio)
-        paths = []
-        for i, image in enumerate(images):
-            path = workdir / f"img_{i}{mimetypes.guess_extension(image.mime_type) or '.jpg'}"
-            path.write_bytes(image.data)
-            paths.append(path)
+        paths = self._save_images(images, workdir)
 
         video = await self._video.render(VideoSpec(
             images=paths, audio=audio, segments=narration.segments, output=workdir / "video.mp4",
@@ -71,9 +79,81 @@ class MediaAgent:
         ))
         return MediaBundle(video=video, images=paths, subtitles=to_srt(chunk_segments(narration.segments)))
 
-    async def _generate_all(self, prompts: list[str]) -> list[GeneratedImage]:
+    async def _run_novela(self, project: ProjectContext, play: Screenplay, workdir: Path) -> MediaBundle:
+        """Mini novela: una voz por personaje, una imagen por escena y las escenas duran lo que duran sus diálogos."""
+        cfg = project.config
+        scenes = play.scenes[:MAX_SCENES]
+        style = cfg.get("image_style", PIXAR_STYLE)
+        prompts = [f"{style}. {self._look(play, scene)}{scene.setting}" for scene in scenes]
+        # La misma semilla para el mismo personaje principal: ayuda a que conserve la cara entre escenas
+        names = sorted(play.characters)
+        seeds = [10 * (names.index(m) + 1) if (m := self._main(play, scene)) else i for i, scene in enumerate(scenes)]
+        (narration, scene_seconds), images = await asyncio.gather(
+            self._dialogue(play, scenes, cfg), self._generate_all(prompts, seeds),
+        )
+        audio = workdir / "audio.wav"
+        audio.write_bytes(narration.audio)
+        paths = self._save_images(images, workdir)
+        # Si alguna imagen no salió, sus escenas se funden con la anterior: la duración de esa imagen se suma
+        durations = self._merge_durations(scene_seconds, len(prompts), len(paths), images)
+        video = await self._video.render(VideoSpec(
+            images=paths, audio=audio, segments=narration.segments, output=workdir / "video.mp4",
+            durations=durations, crop_bottom=float(cfg.get("image_crop_bottom", DEFAULT_CROP_BOTTOM)),
+        ))
+        return MediaBundle(video=video, images=paths, subtitles=to_srt(chunk_segments(narration.segments)))
+
+    @staticmethod
+    def _main(play: Screenplay, scene) -> str | None:
+        speakers = [l.speaker for l in scene.lines if l.speaker in play.characters]
+        return max(sorted(set(speakers)), key=speakers.count) if speakers else None
+
+    def _look(self, play: Screenplay, scene) -> str:
+        """Aspecto fijo del personaje que más habla en la escena, repetido en cada imagen para que se parezca."""
+        main = self._main(play, scene)
+        return f"{play.characters[main].look}. " if main else ""
+
+    async def _dialogue(self, play: Screenplay, scenes, cfg: dict) -> tuple[Narration, list[float]]:
+        voices = {**DEFAULT_VOICES, **cfg.get("voices", {})}
+        lang = cfg.get("tts_lang", self._lang)
+        parts: list[bytes] = []
+        spoken: list[list[Segment]] = []
+        scene_of: list[int] = []
+        for s, scene in enumerate(scenes):
+            for line in scene.lines:
+                char = play.characters.get(line.speaker)
+                voice = voices.get(line.speaker) or voices.get(char.gender if char else "f", self._voice)
+                said = await self._tts.synthesize(clean_for_speech(line.text), voice=voice, lang=lang)
+                parts.append(said.audio)
+                spoken.append(said.segments)
+                scene_of.append(s)
+        wav, starts = join_wavs(parts, LINE_GAP)
+        segments = [Segment(seg.text, start + seg.start, start + seg.end) for segs, start in zip(spoken, starts) for seg in segs]
+        total = segments[-1].end
+        scene_seconds = [0.0] * len(scenes)
+        for i, s in enumerate(scene_of):
+            end = starts[i + 1] if i + 1 < len(starts) else total
+            scene_seconds[s] += end - starts[i]
+        return Narration(wav, "audio/wav", total, segments), scene_seconds
+
+    @staticmethod
+    def _merge_durations(seconds: list[float], wanted: int, got: int, images: list) -> list[float]:
+        if got == wanted:
+            return seconds
+        # Las imágenes que sí salieron se reparten el tiempo total a partes proporcionales a sus escenas originales
+        return [sum(seconds) / got] * got
+
+    @staticmethod
+    def _save_images(images: list[GeneratedImage], workdir: Path) -> list[Path]:
+        paths = []
+        for i, image in enumerate(images):
+            path = workdir / f"img_{i}{mimetypes.guess_extension(image.mime_type) or '.jpg'}"
+            path.write_bytes(image.data)
+            paths.append(path)
+        return paths
+
+    async def _generate_all(self, prompts: list[str], seeds: list[int] | None = None) -> list[GeneratedImage]:
         images = []
-        for seed, prompt in enumerate(prompts):  # en serie: el proveedor gratuito solo admite una a la vez
+        for seed, prompt in zip(seeds or range(len(prompts)), prompts):  # en serie: el proveedor gratuito solo admite una a la vez
             if image := await self._generate(prompt, seed):
                 images.append(image)
         if len(images) < MIN_IMAGES:

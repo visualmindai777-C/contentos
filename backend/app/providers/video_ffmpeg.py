@@ -10,6 +10,13 @@ SUBTITLE_STYLE = (
     "FontName=DejaVu Sans,FontSize=12,Bold=1,Alignment=2,MarginV=90,Outline=3,Shadow=0,"
     "PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000"
 )
+# Un movimiento de cámara distinto por escena (acercar, alejar, paneo) da sensación de profundidad sin animar personajes
+CAMERA = (
+    "z='min(zoom+0.0007,1.15)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'",
+    "z='if(eq(on,1),1.15,max(zoom-0.0007,1.0))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'",
+    "z=1.12:x='(iw-iw/zoom)*on/{frames}':y='ih/2-(ih/zoom/2)'",
+    "z=1.12:x='(iw-iw/zoom)*(1-on/{frames})':y='ih/2-(ih/zoom/2)'",
+)
 ZOOM_OVERSCAN = 1.5  # las imágenes se amplían antes del zoom suave para que no se vea el pixelado
 FOREGROUND_RATIO = 4 / 3  # la imagen nítida es 3:4; el resto del 9:16 se rellena con ella misma desenfocada
 
@@ -39,7 +46,11 @@ class FFmpegVideo:
         audio = spec.audio.resolve()
         duration = await self._duration(audio)
         n = len(spec.images)
-        frames = max(1, round(duration / n * spec.fps))
+        if spec.durations and len(spec.durations) == n:
+            scale = duration / sum(spec.durations)  # el audio manda: las escenas se ajustan a su duración total
+            frames_per = [max(1, round(d * scale * spec.fps)) for d in spec.durations]
+        else:
+            frames_per = [max(1, round(duration / n * spec.fps))] * n
         w, h = spec.width, spec.height
         fh = round(w * FOREGROUND_RATIO / 2) * 2  # altura de la imagen nítida, par para el códec
         bw, bh = int(w * ZOOM_OVERSCAN), int(fh * ZOOM_OVERSCAN)
@@ -50,10 +61,10 @@ class FFmpegVideo:
             f"[{i}:v]{trim}format=yuv420p,split[bg{i}][fg{i}];"
             f"[bg{i}]scale={w // 6}:{h // 6}:force_original_aspect_ratio=increase,crop={w // 6}:{h // 6},"
             f"boxblur=4:2,scale={w}:{h},eq=brightness=-0.1,"
-            f"zoompan=z=1:d={frames}:s={w}x{h}:fps={spec.fps}[b{i}];"
+            f"zoompan=z=1:d={frames_per[i]}:s={w}x{h}:fps={spec.fps}[b{i}];"
             f"[fg{i}]scale={bw}:{bh}:force_original_aspect_ratio=increase:flags=lanczos,crop={bw}:{bh},unsharp=5:5:0.5,"
-            f"zoompan=z='min(zoom+0.0007,1.15)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
-            f":d={frames}:s={w}x{fh}:fps={spec.fps}[f{i}];"
+            f"zoompan={CAMERA[i % len(CAMERA)].replace('{frames}', str(frames_per[i]))}"
+            f":d={frames_per[i]}:s={w}x{fh}:fps={spec.fps}[f{i}];"
             f"[b{i}][f{i}]overlay=0:(H-h)/2,setsar=1[v{i}]"
             for i in range(n)
         ]

@@ -105,3 +105,13 @@ export interface SystemConfig {
   db_limit_mb: number;
   assets_configured: boolean;
 }
+
+export interface IdeaVerdict {
+  viable: boolean;
+  score: number;
+  reason: string;
+  risks: string[];
+  title: string;
+  improvement: string;
+  content_id: string | null;
+}

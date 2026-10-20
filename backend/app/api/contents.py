@@ -1,8 +1,9 @@
 from uuid import UUID
 
 from fastapi import APIRouter
+from pydantic import BaseModel, Field
 
-from app.api.deps import Assets, Contents, Limit, Offset, Publications
+from app.api.deps import Assets, Contents, Ideas, Limit, Offset, Publications
 from app.core.enums import ContentStatus
 from app.schemas.common import ApiResponse, ok
 from app.schemas.entities import (
@@ -73,6 +74,17 @@ async def retry(content_id: UUID, svc: Contents):
 @router.patch("/{content_id}/regenerate", response_model=ApiResponse[ContentOut])
 async def regenerate(content_id: UUID, svc: Contents):
     return ok(await svc.regenerate(content_id))
+
+
+class IdeaRequest(BaseModel):
+    project_id: UUID
+    prompt: str = Field(min_length=10, max_length=1000)
+
+
+@router.post("/from-idea", response_model=ApiResponse[dict])
+async def from_idea(data: IdeaRequest, svc: Ideas):
+    """Evalúa la idea con la IA y, si es viable, la encola. Va antes de /{content_id}: son rutas distintas por método y ruta."""
+    return ok(await svc.evaluate(data.project_id, data.prompt))
 
 
 @router.delete("/{content_id}", response_model=ApiResponse[dict[str, bool]])

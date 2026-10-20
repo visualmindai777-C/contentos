@@ -327,3 +327,34 @@ def test_dashboard_and_limits_come_from_a_single_consistent_snapshot():
     stats, limits, total = run(scenario())
     assert stats.total == total == limits.estimated_content_count and stats.pending >= 1
     assert limits.estimated_tokens_used > 0 and limits.llm_calls_today >= 1  # los assets de prueba pesan bytes: se redondean a 0 MB
+
+
+# --- Evaluar una idea propia ---
+def _idea_llm(verdict: dict):
+    from app.core.types import LLMResponse
+
+    class LLM:
+        async def complete(self, messages, *, json_mode=False, max_tokens=1200):
+            return LLMResponse(json.dumps(verdict), "fake", "m", 10)
+
+    return LLM()
+
+
+def test_idea_viable_is_queued_and_unviable_is_not():
+    from app.services.ideas import IdeaService
+
+    ok_verdict = {"viable": True, "score": 82, "reason": "Buena", "risks": [], "title": "Mi idea (Parte 1)", "improvement": ""}
+
+    async def scenario():
+        async with rig() as r:
+            async with r.sf() as s:
+                good = await IdeaService(s, _idea_llm(ok_verdict)).evaluate(r.pid, "Una pareja descubre un secreto de familia")
+            async with r.sf() as s:
+                bad = await IdeaService(s, _idea_llm({**ok_verdict, "viable": False, "score": 10})).evaluate(r.pid, "Otra idea distinta aquí")
+            async with r.sf() as s:  # score bajo: el modelo dice viable pero no pasa el umbral
+                low = await IdeaService(s, _idea_llm({**ok_verdict, "score": 30})).evaluate(r.pid, "Tercera idea diferente aquí")
+            return good, bad, low, await r.contents()
+
+    good, bad, low, contents = run(scenario())
+    assert good["viable"] and good["content_id"] and not bad["viable"] and bad["content_id"] is None and not low["viable"]
+    assert [c.status for c in contents] == ["idea"] and contents[0].title == "Mi idea (Parte 1)"

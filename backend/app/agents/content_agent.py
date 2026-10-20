@@ -3,6 +3,7 @@ import json
 import re
 
 from app.core.interfaces import LLMClient, ProviderError
+from app.core.screenplay import parse_screenplay
 from app.core.types import ContentDraft, LLMResponse, Message, ProjectContext
 
 WORDS_PER_SECOND = 3  # medido con Kokoro en español: ~55 palabras ≈ 18 s
@@ -29,11 +30,43 @@ Devuelve exactamente este JSON:
 Reglas: de 5 a 8 hashtags; datos verificables, sin inventar cifras; sin afirmaciones médicas ni políticas."""
 
 
+NOVELA_USER = """Proyecto: {name}. Idioma de los diálogos: {language}. Tono: {tone}.
+Tema en tendencia: {topic}
+Palabras clave: {keywords}
+
+Escribe el guion de una MINI NOVELA de unos {seconds} segundos (≈{words} palabras en total entre todos los diálogos) para TikTok, Reels y Shorts, inspirada en el tema, con personajes ficticios.
+Reglas:
+- La primera línea es un gancho que impacta en 3 segundos (una revelación, una acusación, un secreto).
+- 4 escenas. Un giro dentro de la historia y un final abierto (cliffhanger) que deje con ganas de la parte 2.
+- Frases cortas y naturales, como se habla (máx. 18 palabras por línea). Máx. 3 personajes, más un NARRADOR opcional.
+- Sin datos reales de personas ni marcas. Sin violencia gráfica ni contenido sexual.
+
+El campo "script" es texto con saltos de línea y este formato EXACTO:
+PERSONAJES
+NOMBRE | f | aspecto físico y ropa en inglés (pelo, edad, ropa de un color)
+NOMBRE | m | aspecto físico y ropa en inglés
+ESCENA | descripción visual en inglés de UN solo personaje, plano medio, con su aspecto completo, el lugar y la emoción
+NOMBRE: lo que dice
+NOMBRE: lo que dice
+ESCENA | otra descripción visual en inglés
+NOMBRE: lo que dice
+(la letra f o m indica la voz: f femenina, m masculina)
+
+Devuelve exactamente este JSON:
+{{"title": "título llamativo que termine en (Parte 1), máx. 70 caracteres",
+"hook": "la primera frase de la historia",
+"script": "el guion con el formato indicado",
+"caption": "descripción del post, máx. 200 caracteres, con pregunta para comentar",
+"hashtags": ["#uno", "#dos"],
+"cta": "Sígueme para ver la parte 2"}}
+5 a 8 hashtags."""
+
+
 class InvalidDraft(ProviderError):
     """El LLM respondió, pero no con el JSON esperado."""
 
 
-def parse_draft(text: str) -> ContentDraft:
+def parse_draft(text: str, novela: bool = False) -> ContentDraft:
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)  # modelos que razonan en voz alta
     start, end = text.find("{"), text.rfind("}")
     if start < 0 or end <= start:
@@ -52,6 +85,8 @@ def parse_draft(text: str) -> ContentDraft:
     script = field("script")
     if len(script.split()) < MIN_SCRIPT_WORDS:
         raise InvalidDraft("guion demasiado corto")
+    if novela and parse_screenplay(script) is None:
+        raise InvalidDraft("el guion no sigue el formato de novela (PERSONAJES / ESCENA / diálogos)")
     raw = data.get("hashtags")
     if not isinstance(raw, list):
         raise InvalidDraft("falta el campo 'hashtags'")
@@ -73,7 +108,8 @@ class ContentAgent:
 
     async def run(self, project: ProjectContext, topic: str, keywords: list[str]) -> tuple[ContentDraft, LLMResponse]:
         seconds = int(project.config.get("target_seconds", 40))
-        prompt = USER.format(
+        novela = project.config.get("format") == "novela"
+        prompt = (NOVELA_USER if novela else USER).format(
             name=project.name, niche=project.niche or "general", language=project.language,
             tone=project.config.get("tone", "curioso, directo y cercano"), topic=topic,
             keywords=", ".join(keywords) or "—", seconds=seconds, words=seconds * WORDS_PER_SECOND,
@@ -85,7 +121,7 @@ class ContentAgent:
             response = await self._llm.complete(messages, json_mode=True, max_tokens=MAX_TOKENS)
             tokens += response.tokens_used
             try:
-                return parse_draft(response.text), dataclasses.replace(response, tokens_used=tokens)
+                return parse_draft(response.text, novela), dataclasses.replace(response, tokens_used=tokens)
             except InvalidDraft as e:
                 last = e
         raise last
