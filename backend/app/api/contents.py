@@ -73,3 +73,9 @@ async def retry(content_id: UUID, svc: Contents):
 @router.patch("/{content_id}/regenerate", response_model=ApiResponse[ContentOut])
 async def regenerate(content_id: UUID, svc: Contents):
     return ok(await svc.regenerate(content_id))
+
+
+@router.delete("/{content_id}", response_model=ApiResponse[dict[str, bool]])
+async def purge(content_id: UUID, svc: Contents):
+    await svc.purge(content_id)
+    return ok({"deleted": True})

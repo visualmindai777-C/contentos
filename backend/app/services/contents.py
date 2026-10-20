@@ -5,7 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.enums import ContentStatus as S
 from app.core.errors import Conflict, NotFound
+from app.core.interfaces import ObjectStorage
+from app.core.settings import get_settings
 from app.models import Content
+from app.repositories.assets import AssetRepository
 from app.repositories.contents import ContentRepository
 from app.schemas.entities import ContentCreate
 
@@ -22,9 +25,10 @@ TRANSITIONS: dict[S, set[S]] = {
 
 
 class ContentService:
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession, storage: ObjectStorage | None = None):
         self.session = session
         self.repo = ContentRepository(session)
+        self._storage = storage
 
     async def get(self, content_id: UUID) -> Content:
         content = await self.repo.get(content_id)
@@ -73,3 +77,25 @@ class ContentService:
         await self.repo.save(content)
         await self.session.commit()
         return content
+
+    async def purge(self, content_id: UUID) -> None:
+        """Borra un contenido rechazado: primero sus archivos de R2 y, solo si eso salió bien, las filas (assets y publicaciones en cascada)."""
+        content = await self.get(content_id)
+        if content.status != S.RECHAZADO:
+            raise Conflict("Solo se pueden eliminar definitivamente los contenidos rechazados")
+        assets = await AssetRepository(self.session).find_for_content(content_id)
+        if assets:
+            storage = self._storage or self._r2()
+            for asset in assets:
+                await storage.delete(asset.storage_key)  # idempotente: una clave ya borrada no falla
+        await self.session.delete(content)
+        await self.session.commit()
+
+    @staticmethod
+    def _r2() -> ObjectStorage:
+        s = get_settings()
+        if not (s.r2_account_id and s.r2_access_key_id and s.r2_secret_access_key):
+            raise Conflict("La API no tiene credenciales de R2: no se pueden borrar los archivos")
+        from app.providers.storage_r2 import R2Storage  # boto3 solo se carga si hay algo que borrar
+
+        return R2Storage(s.r2_account_id, s.r2_access_key_id, s.r2_secret_access_key, s.r2_bucket)

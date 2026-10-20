@@ -82,6 +82,7 @@ export const api = {
   approve: (id: string) => patch<Content>(`/contents/${id}/approve`),
   reject: (id: string) => patch<Content>(`/contents/${id}/reject`),
   regenerate: (id: string) => patch<Content>(`/contents/${id}/regenerate`),
+  purge: (id: string) => request<{ deleted: boolean }>("DELETE", `/contents/${id}`),
   retry: (id: string) => patch<Content>(`/contents/${id}/retry`),
   publish: (id: string, b: { platform: string; published_at?: string; notes: string }) =>
     patch<Publication>(`/contents/${id}/publish`, b),

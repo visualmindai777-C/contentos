@@ -14,11 +14,12 @@ dependencies = [
   "pydantic>=2.7",
   "pydantic-settings>=2.3",
   "httpx>=0.27",  # tendencias a demanda desde la API
+  "boto3>=1.34",  # borrar archivos de R2 desde la API
 ]
 
 [project.optional-dependencies]
 # Solo el workflow de GitHub Actions las instala (torch CPU va aparte). La API no las necesita.
-pipeline = ["boto3>=1.34", "kokoro>=0.9.4", "soundfile>=0.12", "numpy", "langgraph>=0.6"]
+pipeline = ["kokoro>=0.9.4", "soundfile>=0.12", "numpy", "langgraph>=0.6"]
 dev = ["pytest>=8"]
 
 [tool.setuptools.packages.find]

@@ -283,3 +283,27 @@ def test_regenerate_replaces_assets_and_deletes_stale_objects():
 
     r, result, stale, keys = run(scenario())
     assert result.generated == 1 and stale not in keys and stale not in r.store.objects and r.llm.calls == 2
+
+
+def test_purge_deletes_files_and_rows_only_for_rejected_contents():
+    from app.core.errors import Conflict
+
+    async def scenario():
+        async with rig() as r:
+            await r.batch()
+            (content,) = await r.contents()
+            keys = set(r.store.objects)
+            async with r.sf() as s:
+                with pytest.raises(Conflict):  # generado: no se puede borrar
+                    await ContentService(s, r.store).purge(content.id)
+                (await s.get(Content, content.id)).status = "rechazado"
+                await s.commit()
+            async with r.sf() as s:
+                await ContentService(s, r.store).purge(content.id)
+            async with r.sf() as s:
+                left = (await s.scalars(select(Asset).where(Asset.content_id == content.id))).all()
+                gone = await s.get(Content, content.id) is None
+            return r, keys, left, gone
+
+    r, keys, left, gone = run(scenario())
+    assert keys and not r.store.objects and not left and gone

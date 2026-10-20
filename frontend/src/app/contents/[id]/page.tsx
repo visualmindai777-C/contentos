@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { approve, publish, regenerate, reject, retry } from "@/app/actions";
+import { approve, publish, purge, regenerate, reject, retry } from "@/app/actions";
 import { ActionButton } from "@/components/action-button";
 import { ActionForm } from "@/components/action-form";
 import { CopyButton } from "@/components/copy-button";
@@ -47,7 +47,8 @@ export default async function ContentDetailPage({ params }: { params: Promise<{ 
   const canApprove = ["generado", "revisado"].includes(status);
   const canReject = ["idea", "guion", "generado", "revisado", "aprobado"].includes(status);
   const canRegenerate = !["idea", "publicado"].includes(status);
-  const hasActions = canApprove || canReject || canRegenerate;
+  const canPurge = status === "rechazado";
+  const hasActions = canApprove || canReject || canRegenerate || canPurge;
   const caption = [content.caption, content.hashtags.join(" ")].filter(Boolean).join("\n\n");
 
   return (
@@ -95,6 +96,15 @@ export default async function ContentDetailPage({ params }: { params: Promise<{ 
             {canApprove && <ActionButton action={approve.bind(null, id)}>Aprobar</ActionButton>}
             {canReject && (
               <ActionButton variant="destructive" confirm="¿Rechazar este contenido?" action={reject.bind(null, id)}>Rechazar</ActionButton>
+            )}
+            {canPurge && (
+              <ActionButton
+                variant="destructive"
+                confirm="¿Eliminar definitivamente? Se borran el video, las imágenes y el registro. No se puede deshacer."
+                action={purge.bind(null, id)}
+              >
+                Eliminar definitivamente
+              </ActionButton>
             )}
             {canRegenerate && (
               <ActionButton variant="outline" confirm="Se volverá a generar y se sobrescribirá el contenido actual." action={regenerate.bind(null, id)}>

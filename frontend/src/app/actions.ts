@@ -26,6 +26,16 @@ export async function reject(id: string) {
   return run(() => api.reject(id));
 }
 
+export async function purge(id: string) {
+  try {
+    await api.purge(id);
+  } catch (e) {
+    return message(e);
+  }
+  refresh();
+  redirect("/contents?status=rechazado");
+}
+
 export async function regenerate(id: string) {
   return run(() => api.regenerate(id));
 }
