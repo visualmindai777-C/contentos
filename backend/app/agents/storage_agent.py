@@ -159,6 +159,10 @@ class StorageAgent:
             except Exception:
                 logger.warning("stale asset not deleted", extra={"fields": {"key": key}})
 
+    async def recent_titles(self, project_id: UUID, exclude: UUID | None = None, limit: int = 10) -> tuple[str, ...]:
+        async with self._sf() as s:
+            return tuple(await ContentRepository(s).recent_titles(project_id, exclude, limit))
+
     async def mark_failed(self, content_id: UUID, error: str) -> None:
         """Registra el fallo y saca el contenido de la cola hasta que el usuario lo reintente desde el portal.
         El estado no cambia: 'idea' repite el LLM, 'guion' solo la media."""

@@ -407,3 +407,42 @@ def test_sources_give_a_short_summary():
 
     (w,) = run(WikipediaSource(transport=transport(wiki)).fetch(PROJECT, 5))
     assert w.summary.startswith("Es un actor mexicano.") and w.summary.endswith("…") and len(w.summary) <= 262
+
+
+# --- Sesgos: términos vetados y no repetirse ---
+def test_banned_terms_match_whole_words_ignoring_case_accents_and_punctuation():
+    from app.core.blocklist import banned_terms, find_banned
+
+    terms = banned_terms({"banned_terms": ["Hacienda Falsa"]})
+    assert find_banned("Un hacker al estilo de MR. ROBOT", terms) == "mr robot"
+    assert find_banned("La serie Mr Robot es genial", terms) == "mr robot"
+    assert find_banned("Visitó la hacienda  falsa", terms) == "Hacienda Falsa"
+    assert find_banned("Un robot amable ayuda a la señora Roberta", terms) is None
+
+
+def test_trends_and_drafts_that_mention_banned_terms_are_dropped_or_retried():
+    from app.agents.content_agent import ContentAgent
+    from app.agents.trend_agent import TrendAgent
+    from app.core.types import LLMResponse, TrendCandidate
+
+    class Source:
+        name = "fake"
+
+        async def fetch(self, project, limit):
+            return [TrendCandidate("Final de Mr. Robot explicado", 90, [], "fake"), TrendCandidate("Receta de pan", 50, [], "fake")]
+
+    topics = run(TrendAgent([Source()]).discover(ProjectContext(uuid.uuid4(), "P", "x", "es", {})))
+    assert [t.topic for t in topics] == ["Receta de pan"]
+
+    bad = json.dumps({"title": "Un hacker como Mr. Robot", "hook": "h", "script": "palabra " * 40, "caption": "c", "hashtags": ["#a"], "cta": "x"})
+    good = json.dumps({"title": "Una panadera valiente", "hook": "h", "script": "palabra " * 40, "caption": "c", "hashtags": ["#a"], "cta": "x"})
+    replies, prompts = [bad, good], []
+
+    class LLM:
+        async def complete(self, messages, *, json_mode=False, max_tokens=1200):
+            prompts.append(messages[-1].content)
+            return LLMResponse(replies.pop(0), "fake", "m", 5)
+
+    draft, _ = run(ContentAgent(LLM()).run(ProjectContext(uuid.uuid4(), "P", "x", "es", {}), "pan", [], recent=("Mi suegra y el testamento",)))
+    assert draft.title == "Una panadera valiente" and len(prompts) == 2
+    assert "Mr. Robot" in prompts[0] and "NO repitas" in prompts[0] and "Mi suegra y el testamento" in prompts[0]

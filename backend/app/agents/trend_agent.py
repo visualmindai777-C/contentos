@@ -2,6 +2,7 @@ import asyncio
 import logging
 from collections.abc import Sequence
 
+from app.core.blocklist import banned_terms, find_banned
 from app.core.interfaces import ProviderError, TrendSource
 from app.core.text import extract_keywords
 from app.core.types import ProjectContext, TrendCandidate
@@ -39,7 +40,10 @@ class TrendAgent:
         weights = {**DEFAULT_WEIGHTS, **project.config.get("source_weights", {})}
         terms = set(extract_keywords(" ".join([project.niche, *project.config.get("keywords", [])]), limit=50))
         best: dict[str, TrendCandidate] = {}
+        banned = banned_terms(project.config)
         for c in candidates:
+            if find_banned(f"{c.topic} {c.summary}", banned):
+                continue
             bonus = min(3, len(terms & set(c.keywords))) * RELEVANCE_BONUS
             score = min(100.0, round(c.score * weights.get(c.source, 1.0) + bonus, 1))
             key = c.topic.casefold()

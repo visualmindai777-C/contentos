@@ -3,6 +3,7 @@ import json
 import re
 
 from app.core.interfaces import LLMClient, ProviderError
+from app.core.blocklist import banned_terms, find_banned
 from app.core.screenplay import parse_screenplay
 from app.core.types import ContentDraft, LLMResponse, Message, ProjectContext
 
@@ -103,7 +104,7 @@ class InvalidDraft(ProviderError):
     """El LLM respondió, pero no con el JSON esperado."""
 
 
-def parse_draft(text: str, novela: bool = False) -> ContentDraft:
+def parse_draft(text: str, novela: bool = False, banned: tuple[str, ...] = ()) -> ContentDraft:
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)  # modelos que razonan en voz alta
     start, end = text.find("{"), text.rfind("}")
     if start < 0 or end <= start:
@@ -124,6 +125,8 @@ def parse_draft(text: str, novela: bool = False) -> ContentDraft:
         raise InvalidDraft("guion demasiado corto")
     if novela and parse_screenplay(script) is None:
         raise InvalidDraft("el guion no sigue el formato de novela (PERSONAJES / ESCENA / diálogos)")
+    if hit := find_banned(" ".join(str(data.get(k, "")) for k in ("title", "hook", "script", "caption")), banned):
+        raise InvalidDraft(f"menciona «{hit}», un término vetado")
     raw = data.get("hashtags")
     if not isinstance(raw, list):
         raise InvalidDraft("falta el campo 'hashtags'")
@@ -145,6 +148,7 @@ class ContentAgent:
 
     async def run(
         self, project: ProjectContext, topic: str, keywords: list[str], *, previous: str = "", part: int = 1, instructions: bool = False,
+        recent: tuple[str, ...] = (),
     ) -> tuple[ContentDraft, LLMResponse]:
         seconds = int(project.config.get("target_seconds", 40))
         novela = project.config.get("format") == "novela"
@@ -157,8 +161,8 @@ class ContentAgent:
                 else "termina con un nuevo final abierto (cliffhanger) que deje con ganas de la parte siguiente.",
                 cta="Gracias por seguir la serie" if final else "Sígueme para ver la siguiente parte",
             )
-            messages = [Message("system", SYSTEM), Message("user", prompt)]
-            return await self._complete(messages, novela)
+            messages = [Message("system", SYSTEM), Message("user", prompt + self._guard(recent))]
+            return await self._complete(messages, novela, banned_terms(project.config))
         prompt = (NOVELA_USER if novela else USER).format(
             name=project.name, niche=project.niche or "general", language=project.language,
             tone=project.config.get("tone", "curioso, directo y cercano"), topic=topic,
@@ -166,16 +170,27 @@ class ContentAgent:
         )
         if instructions:
             prompt = USER_INSTRUCTIONS.format(topic=topic) + prompt
+        prompt += self._guard(recent)
         messages = [Message("system", SYSTEM), Message("user", prompt)]
-        return await self._complete(messages, novela)
+        return await self._complete(messages, novela, () if instructions else banned_terms(project.config))
 
-    async def _complete(self, messages: list[Message], novela: bool) -> tuple[ContentDraft, LLMResponse]:
+    @staticmethod
+    def _guard(recent: tuple[str, ...]) -> str:
+        """Reglas finales contra el sesgo del modelo: nada de obras ajenas y nada de repetirse."""
+        text = "\n\nAdemás: no menciones ni imites series, películas, libros, videojuegos, marcas ni personajes existentes (por ejemplo Mr. Robot); inventa personajes, nombres y situaciones propios."
+        if recent:
+            text += " Ya hicimos estos videos, así que NO repitas sus personajes, nombres, giros ni escenarios: " + "; ".join(recent) + "."
+        return text
+
+    async def _complete(
+        self, messages: list[Message], novela: bool, banned: tuple[str, ...] = (),
+    ) -> tuple[ContentDraft, LLMResponse]:
         tokens, last = 0, InvalidDraft("sin intentos")
         for _ in range(self._max_attempts):
             response = await self._llm.complete(messages, json_mode=True, max_tokens=MAX_TOKENS)
             tokens += response.tokens_used
             try:
-                return parse_draft(response.text, novela), dataclasses.replace(response, tokens_used=tokens)
+                return parse_draft(response.text, novela, banned), dataclasses.replace(response, tokens_used=tokens)
             except InvalidDraft as e:
                 last = e
         raise last

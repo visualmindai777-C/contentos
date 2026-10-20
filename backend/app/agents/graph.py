@@ -78,6 +78,7 @@ def build_graph(agents: Agents):
         draft, llm = await agents.content.run(
             state["project"], state["topic"], state["keywords"], previous=state.get("previous", ""), part=state.get("part", 1),
             instructions=state.get("instructions", False),
+            recent=await storage.recent_titles(state["project"].id, state["content_id"]),
         )
         await storage.save_draft(state["content_id"], draft, llm)
         return {"draft": draft, "llm": llm, "status": "guion"}

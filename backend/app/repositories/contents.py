@@ -74,6 +74,12 @@ class ContentRepository(Repository):
         """), {"id": content_id})
         return [(r.part, r.title, r.script) for r in rows]
 
+    async def recent_titles(self, project_id: UUID, exclude: UUID | None, limit: int) -> list[str]:
+        query = select(Content.title).where(Content.project_id == project_id, Content.title != "").order_by(Content.created_at.desc()).limit(limit + 1)
+        if exclude:
+            query = query.where(Content.id != exclude)
+        return list((await self.session.scalars(query)).all())[:limit]
+
     async def has_child(self, content_id: UUID) -> bool:
         return await self.session.scalar(select(select(Content.id).where(Content.parent_id == content_id).exists())) or False
 
