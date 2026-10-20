@@ -65,8 +65,13 @@ jobs:
 
   # La URL de la API la fija Render al crear el servicio, así que esta etapa lo crea (o lo encuentra) y la publica:
   # el Worker y el portal la necesitan para desplegarse. Si backend/ cambió, además lanza un deploy.
+  # Nada se despliega si las pruebas del backend fallan
+  tests:
+    if: vars.DEPLOY_ENABLED == 'true'
+    uses: ./.github/workflows/tests.yml
+
   api:
-    needs: changes
+    needs: [changes, tests]
     if: needs.changes.outputs.any == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30

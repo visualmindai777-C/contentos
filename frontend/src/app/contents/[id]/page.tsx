@@ -3,6 +3,8 @@ import { approve, createNextPart, publish, purge, regenerate, reject, retry } fr
 import { ActionButton } from "@/components/action-button";
 import { ActionForm } from "@/components/action-form";
 import { CopyButton } from "@/components/copy-button";
+import { AutoRefresh } from "@/components/auto-refresh";
+import { ScriptEditor } from "@/components/script-editor";
 import { Stepper } from "@/components/stepper";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +53,8 @@ export default async function ContentDetailPage({ params }: { params: Promise<{ 
   const canReject = ["idea", "guion", "generado", "revisado", "aprobado"].includes(status);
   const canRegenerate = !["idea", "publicado"].includes(status);
   const canPurge = status === "rechazado";
+  const canEditScript = ["generado", "revisado", "aprobado"].includes(status) && !!content.script;
+  const processing = ["idea", "guion"].includes(status) && !content.last_error;
   const isSeries = series.length > 1 || content.part > 1;
   const hasNext = series.some((p) => p.part === content.part + 1);
   const canContinue = ["generado", "revisado", "aprobado", "publicado"].includes(status) && !hasNext;
@@ -59,6 +63,7 @@ export default async function ContentDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="max-w-4xl space-y-4">
+      <AutoRefresh active={processing} />
       <div className="space-y-1">
         {isSeries && <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Serie · parte {content.part}</p>}
         <h1 className="text-xl font-semibold">{content.title || "(pendiente de generar)"}</h1>
@@ -172,6 +177,8 @@ export default async function ContentDetailPage({ params }: { params: Promise<{ 
           </CardContent>
         </Card>
       )}
+
+      {canEditScript && <ScriptEditor id={id} script={content.script} />}
 
       {downloads.length > 0 && (
         <Card>

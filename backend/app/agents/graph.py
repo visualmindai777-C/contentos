@@ -56,7 +56,7 @@ def build_graph(agents: Agents):
             job = await storage.load_job(content_id)
             update = {
                 "project": job.project, "status": job.status, "topic": job.topic, "keywords": job.keywords,
-                "part": job.part, "previous": job.previous, "instructions": job.instructions,
+                "part": job.part, "previous": job.previous, "images": list(job.images), "instructions": job.instructions,
             }
             return update | ({"draft": job.draft} if job.draft else {})
         return {"has_unused": await storage.has_unused_topic(state["project"].id)}
@@ -86,7 +86,9 @@ def build_graph(agents: Agents):
     async def media(state: PipelineState) -> dict:
         workdir = Path(tempfile.mkdtemp(prefix="contentos-"))
         try:
-            bundle = await agents.media.run(state["project"], state["topic"], state["draft"], workdir)
+            bundle = await agents.media.run(
+                state["project"], state["topic"], state["draft"], workdir, existing_images=state.get("images") or None,
+            )
         except BaseException:
             shutil.rmtree(workdir, ignore_errors=True)
             raise

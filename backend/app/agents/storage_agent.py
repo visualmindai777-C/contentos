@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import mimetypes
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,6 +30,7 @@ class Job:
     topic: str
     keywords: list[str]
     draft: ContentDraft | None
+    images: tuple[bytes, ...] = ()  # imágenes ya generadas: al corregir el texto solo se rehacen voz y video
     part: int = 1
     instructions: bool = False  # el tema es un texto del propio usuario (Mi idea): se sigue al pie de la letra
     previous: str = ""  # guiones de las partes anteriores de la serie
@@ -68,17 +70,30 @@ class StorageAgent:
                 raise LookupError(f"contenido {content_id} no existe")
             project = await ProjectRepository(s).get(content.project_id)
             earlier = await ContentRepository(s).previous_scripts(content_id) if content.parent_id else []
+            keys = sorted(
+                (a.storage_key for a in await AssetRepository(s).find_for_content(content_id) if a.kind == "image"),
+                key=lambda k: int(re.search(r"img_(\d+)", k).group(1)) if re.search(r"img_(\d+)", k) else 0,
+            )
             topic = await TopicRepository(s).get(content.topic_id) if content.topic_id else None
         # 'guion' sin guion es un estado incoherente: se rehace desde el LLM
         has_script = content.status == ContentStatus.GUION and bool(content.script)
         draft = ContentDraft(content.title, content.hook, content.script, content.caption, content.hashtags, content.cta)
+        images = await self._existing_images(keys) if has_script else ()
         return Job(
             content_id=content.id, status="guion" if has_script else "idea", project=_context(project),
             topic=_with_summary(topic) if topic else content.title, keywords=topic.keywords if topic else [],
-            draft=draft if has_script else None, part=content.part,
+            draft=draft if has_script else None, images=images, part=content.part,
             instructions=bool(topic and topic.source == "idea"),
             previous="\n\n".join(f"PARTE {n} — {title}\n{script}" for n, title, script in earlier),
         )
+
+    async def _existing_images(self, keys: list[str]) -> tuple[bytes, ...]:
+        """Si alguna imagen no se puede leer, se descartan todas: es mejor regenerarlas que mezclar."""
+        try:
+            return tuple(await asyncio.gather(*(self._storage.get_bytes(k) for k in keys)))
+        except Exception:
+            logger.warning("existing images not readable", extra={"fields": {"count": len(keys)}})
+            return ()
 
     # --- tendencias ---
     async def has_unused_topic(self, project_id: UUID) -> bool:

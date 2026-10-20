@@ -7,10 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, NotFound, TooManyRequests
 from app.core.interfaces import LLMClient, ProviderError, RateLimitError
-from app.core.settings import get_settings
 from app.core.screenplay import parse_screenplay
 from app.core.types import Message
 from app.models import Content, Project, Topic
+from app.services.llm import make_llm
 
 MIN_SCORE = 50  # por debajo, aunque el modelo diga que sí, no se crea: el score manda
 MAX_PROMPT = 4000
@@ -70,12 +70,7 @@ class IdeaService:
 
     def _client(self) -> LLMClient:
         if self._llm is None:
-            s = get_settings()
-            if not s.openrouter_api_key:
-                raise AppError("La API no tiene configurada la clave de la IA")
-            from app.providers.llm_openrouter import OpenRouterClient  # httpx solo se carga si hace falta
-
-            self._llm = OpenRouterClient(s.openrouter_api_key, s.openrouter_model_list)
+            self._llm = make_llm()
         return self._llm
 
     async def evaluate(self, project_id: UUID, prompt: str) -> dict:

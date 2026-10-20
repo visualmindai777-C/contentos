@@ -2,7 +2,7 @@ import asyncio
 import logging
 import mimetypes
 import re
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path
 
 from app.core.audio import join_wavs
@@ -59,16 +59,21 @@ class MediaAgent:
         self._retries = retries
         self._sleep = sleep
 
-    async def run(self, project: ProjectContext, topic: str, draft: ContentDraft, workdir: Path) -> MediaBundle:
+    async def run(
+        self, project: ProjectContext, topic: str, draft: ContentDraft, workdir: Path, *, existing_images: Sequence[bytes] | None = None,
+    ) -> MediaBundle:
         cfg = project.config
         play = parse_screenplay(draft.script) if cfg.get("format") == "novela" else None
         if play:
-            return await self._run_novela(project, play, workdir)
+            return await self._run_novela(project, play, workdir, existing_images)
         narration, images = await asyncio.gather(
             self._tts.synthesize(
                 clean_for_speech(draft.script), voice=cfg.get("tts_voice", self._voice), lang=cfg.get("tts_lang", self._lang)
             ),
-            self._generate_all(scene_prompts(draft.script, topic, int(cfg.get("images_per_video", 4)), cfg.get("image_style", DEFAULT_STYLE))),
+            self._generate_all(
+                scene_prompts(draft.script, topic, int(cfg.get("images_per_video", 4)), cfg.get("image_style", DEFAULT_STYLE)),
+                None, existing_images,
+            ),
         )
         audio = workdir / "audio.wav"
         audio.write_bytes(narration.audio)
@@ -80,7 +85,9 @@ class MediaAgent:
         ))
         return MediaBundle(video=video, images=paths, subtitles=to_srt(chunk_segments(narration.segments)))
 
-    async def _run_novela(self, project: ProjectContext, play: Screenplay, workdir: Path) -> MediaBundle:
+    async def _run_novela(
+        self, project: ProjectContext, play: Screenplay, workdir: Path, existing: Sequence[bytes] | None = None,
+    ) -> MediaBundle:
         """Mini novela: una voz por personaje, una imagen por escena y las escenas duran lo que duran sus diálogos."""
         cfg = project.config
         scenes = play.scenes[:MAX_SCENES]
@@ -90,7 +97,7 @@ class MediaAgent:
         names = sorted(play.characters)
         seeds = [10 * (names.index(m) + 1) if (m := self._main(play, scene)) else i for i, scene in enumerate(scenes)]
         (narration, scene_seconds), images = await asyncio.gather(
-            self._dialogue(play, scenes, cfg), self._generate_all(prompts, seeds),
+            self._dialogue(play, scenes, cfg), self._generate_all(prompts, seeds, existing),
         )
         audio = workdir / "audio.wav"
         audio.write_bytes(narration.audio)
@@ -160,10 +167,15 @@ class MediaAgent:
         watermark, outro = BRAND_DIR / "watermark.png", BRAND_DIR / "outro.png"
         return {"watermark": watermark if watermark.exists() else None, "outro": outro if outro.exists() else None}
 
-    async def _generate_all(self, prompts: list[str], seeds: list[int] | None = None) -> list[GeneratedImage]:
+    async def _generate_all(
+        self, prompts: list[str], seeds: list[int] | None = None, existing: Sequence[bytes] | None = None,
+    ) -> list[GeneratedImage]:
         images = []
-        for seed, prompt in zip(seeds or range(len(prompts)), prompts):  # en serie: el proveedor gratuito solo admite una a la vez
-            if image := await self._generate(prompt, seed):
+        for i, (seed, prompt) in enumerate(zip(seeds or range(len(prompts)), prompts)):  # en serie: el proveedor gratuito solo admite una a la vez
+            if existing and i < len(existing):  # imagen ya generada (corrección de texto): no se vuelve a pedir
+                data = existing[i]
+                images.append(GeneratedImage(data, "image/png" if data.startswith(b"\x89PNG") else "image/jpeg"))
+            elif image := await self._generate(prompt, seed):
                 images.append(image)
         if len(images) < MIN_IMAGES:
             raise ProviderError(f"solo se generaron {len(images)} de {len(prompts)} imágenes")

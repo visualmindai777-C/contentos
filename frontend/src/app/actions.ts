@@ -55,6 +55,18 @@ export async function runPipeline(): Promise<string> {
   }
 }
 
+export async function reviseScript(id: string, instruction: string): Promise<{ script?: string; error?: string }> {
+  try {
+    return { script: (await api.reviseScript(id, instruction)).script };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function updateScript(id: string, script: string) {
+  return run(() => api.updateScript(id, script));
+}
+
 export async function createNextPart(id: string) {
   let next: string;
   try {

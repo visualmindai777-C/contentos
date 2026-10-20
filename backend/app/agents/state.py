@@ -13,6 +13,7 @@ class PipelineState(TypedDict, total=False):
     status: str  # idea | guion | generado (refleja contents.status)
     topic: str
     keywords: list[str]
+    images: list[bytes]
     part: int
     instructions: bool
     previous: str

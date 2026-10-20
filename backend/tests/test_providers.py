@@ -194,6 +194,10 @@ class FakeS3:
     def upload_file(self, path, bucket, key, **kw): self.calls.append(("upload_file", key, kw["ExtraArgs"]["ContentType"]))
     def delete_object(self, **kw): self.calls.append(("delete_object", kw["Key"]))
 
+    def get_object(self, **kw):
+        import io
+        return {"Body": io.BytesIO(b"datos")}
+
 
 def test_r2_operations(tmp_path):
     s3 = FakeS3()
@@ -202,6 +206,7 @@ def test_r2_operations(tmp_path):
     video.write_bytes(b"12345")
     assert run(store.put_bytes("c/1/caption.txt", b"hola", "text/plain")).file_size == 4
     assert run(store.put_file("c/1/video.mp4", video, "video/mp4")).file_size == 5
+    assert run(store.get_bytes("c/1/caption.txt")) == b"datos"
     run(store.delete("c/1/caption.txt"))
     assert [c[0] for c in s3.calls] == ["put_object", "upload_file", "delete_object"]
 
@@ -446,3 +451,31 @@ def test_trends_and_drafts_that_mention_banned_terms_are_dropped_or_retried():
     draft, _ = run(ContentAgent(LLM()).run(ProjectContext(uuid.uuid4(), "P", "x", "es", {}), "pan", [], recent=("Mi suegra y el testamento",)))
     assert draft.title == "Una panadera valiente" and len(prompts) == 2
     assert "Mr. Robot" in prompts[0] and "NO repitas" in prompts[0] and "Mi suegra y el testamento" in prompts[0]
+
+
+def test_media_agent_reuses_existing_images_and_only_generates_the_missing_ones(tmp_path):
+    from app.agents.media_agent import MediaAgent
+    from app.core.types import ContentDraft, GeneratedImage, Narration, RenderedVideo
+
+    prompts, specs = [], []
+
+    class TTS:
+        async def synthesize(self, text, *, voice, lang):
+            return Narration(_wav(1.0), "audio/wav", 1.0, [Segment(text, 0.0, 1.0)])
+
+    class Images:
+        async def generate(self, prompt, *, width, height, seed):
+            prompts.append(prompt)
+            return GeneratedImage(b"\xff\xd8nueva", "image/jpeg")
+
+    class Video:
+        async def render(self, spec):
+            specs.append(spec)
+            return RenderedVideo(spec.output, 5.0, 1)
+
+    project = ProjectContext(uuid.uuid4(), "N", "general", "es", {"format": "novela"})
+    draft = ContentDraft("T", "h", NOVELA, "c", ["#a"], "cta")  # 2 escenas
+    run(MediaAgent(TTS(), Images(), Video(), voice="ef_dora", lang="e").run(
+        project, "tema", draft, tmp_path, existing_images=[b"\xff\xd8vieja"]))
+    assert len(prompts) == 1 and "bearded" in prompts[0]  # solo la escena 2 se pidió de nuevo
+    assert specs[0].images[0].read_bytes() == b"\xff\xd8vieja" and specs[0].images[1].read_bytes() == b"\xff\xd8nueva"

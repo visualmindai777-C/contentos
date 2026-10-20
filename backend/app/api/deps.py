@@ -10,6 +10,7 @@ from app.services.dashboard import DashboardService
 from app.services.discovery import DiscoveryService
 from app.services.ideas import IdeaService
 from app.services.projects import ProjectService
+from app.services.revision import RevisionService
 from app.services.publications import PublicationService
 from app.services.topics import TopicService
 from app.services.usage import UsageService
@@ -32,6 +33,7 @@ Publications = Annotated[PublicationService, provide(PublicationService)]
 Dashboard = Annotated[DashboardService, provide(DashboardService)]
 Discovery = Annotated[DiscoveryService, provide(DiscoveryService)]
 Ideas = Annotated[IdeaService, provide(IdeaService)]
+Revisions = Annotated[RevisionService, provide(RevisionService)]
 Usage = Annotated[UsageService, provide(UsageService)]
 
 Limit = Annotated[int, Query(ge=1, le=100)]

@@ -71,6 +71,8 @@ class ObjectStorage(Protocol):
 
     async def delete(self, key: str) -> None: ...
 
+    async def get_bytes(self, key: str) -> bytes: ...
+
 
 @runtime_checkable
 class TrendSource(Protocol):

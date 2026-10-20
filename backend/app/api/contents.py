@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from app.api.deps import Assets, Contents, Ideas, Limit, Offset, Publications
+from app.api.deps import Assets, Contents, Ideas, Limit, Offset, Publications, Revisions
 from app.core.enums import ContentStatus
 from app.schemas.common import ApiResponse, ok
 from app.schemas.entities import (
@@ -85,6 +85,25 @@ class IdeaRequest(BaseModel):
 async def from_idea(data: IdeaRequest, svc: Ideas):
     """Evalúa la idea con la IA y, si es viable, la encola. Va antes de /{content_id}: son rutas distintas por método y ruta."""
     return ok(await svc.evaluate(data.project_id, data.prompt))
+
+
+class ScriptUpdate(BaseModel):
+    script: str = Field(min_length=20, max_length=6000)
+    title: str | None = Field(default=None, max_length=100)
+
+
+@router.patch("/{content_id}/script", response_model=ApiResponse[ContentOut])
+async def update_script(content_id: UUID, data: ScriptUpdate, svc: Contents):
+    return ok(await svc.update_script(content_id, data.script, data.title))
+
+
+class ReviseRequest(BaseModel):
+    instruction: str = Field(min_length=5, max_length=1000)
+
+
+@router.post("/{content_id}/revise", response_model=ApiResponse[dict[str, str]])
+async def revise_script(content_id: UUID, data: ReviseRequest, svc: Revisions):
+    return ok(await svc.propose(content_id, data.instruction))
 
 
 @router.post("/{content_id}/next-part", response_model=ApiResponse[ContentOut], status_code=201)

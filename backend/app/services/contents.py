@@ -7,7 +7,8 @@ from app.core.enums import ContentStatus as S
 from app.core.errors import Conflict, NotFound
 from app.core.interfaces import ObjectStorage
 from app.core.settings import get_settings
-from app.models import Content
+from app.core.screenplay import parse_screenplay
+from app.models import Content, Project
 from app.repositories.assets import AssetRepository
 from app.repositories.contents import ContentRepository
 from app.schemas.entities import ContentCreate
@@ -73,6 +74,23 @@ class ContentService:
         content = await self.get(content_id)
         if content.status not in (S.IDEA, S.GUION) or not content.last_error:
             raise Conflict("El contenido no tiene un error que reintentar")
+        content.last_error = ""
+        await self.repo.save(content)
+        await self.session.commit()
+        return content
+
+    async def update_script(self, content_id: UUID, script: str, title: str | None = None) -> Content:
+        """Corrige el texto de un video ya generado. Las imágenes se conservan: vuelve a la cola solo para rehacer voz y video."""
+        content = await self.get(content_id)
+        if S(content.status) not in (S.GENERADO, S.REVISADO, S.APROBADO):
+            raise Conflict("Solo se puede corregir un video generado y aún sin publicar")
+        project = await self.session.get(Project, content.project_id)
+        if (project.config or {}).get("format") == "novela" and parse_screenplay(script) is None:
+            raise Conflict("El guion no sigue el formato de novela (PERSONAJES / ESCENA / diálogos)")
+        content.script = script.strip()
+        if title and title.strip():
+            content.title = title.strip()[:100]
+        content.status = S.GUION.value
         content.last_error = ""
         await self.repo.save(content)
         await self.session.commit()

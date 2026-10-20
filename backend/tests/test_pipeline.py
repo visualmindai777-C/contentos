@@ -89,6 +89,9 @@ class FakeStorage:
     async def delete(self, key):
         self.objects.pop(key, None)
 
+    async def get_bytes(self, key):
+        return self.objects[key]
+
 
 class FakeTrend:
     name = "fake"
@@ -475,3 +478,54 @@ def test_topics_can_be_deleted_and_unused_ones_cleared_in_bulk():
     assert listed == {"usado": True, "sin usar": False}  # la idea del usuario no se lista
     assert removed == 1 and remaining == {"usado", "idea mia"}
     assert content.topic_id is None  # el contenido sobrevive al borrado del tema
+
+
+# --- Corregir el texto sin regenerar las imágenes ---
+def test_correcting_the_script_reuses_the_stored_images_and_only_redoes_voice_and_video():
+    from app.services.revision import RevisionService
+
+    async def scenario():
+        async with rig() as r:
+            await r.batch()
+            (content,) = await r.contents()
+            images_after_first = r.images.calls
+            fixed = SCRIPT.replace("Segunda frase del guion", "Frase corregida del guion")
+            async with r.sf() as s:
+                proposed = await RevisionService(s, FakeLLM(fixed)).propose(content.id, "Corrige la segunda frase")
+                await ContentService(s).update_script(content.id, proposed["script"])
+            async with r.sf() as s:
+                queued = (await s.get(Content, content.id)).status
+            await r.batch(limit=1)
+            (after,) = await r.contents()
+            async with r.sf() as s:
+                kinds = [a.kind for a in (await s.scalars(select(Asset).where(Asset.content_id == content.id))).all()]
+            return r, images_after_first, queued, after, kinds
+
+    r, images_first, queued, after, kinds = run(scenario())
+    assert queued == "guion" and after.status == "generado" and "Frase corregida" in after.script
+    assert r.images.calls == images_first  # ninguna imagen nueva: Pollinations no se tocó
+    assert kinds.count("image") >= 1 and "video" in kinds
+
+
+def test_script_correction_is_rejected_for_published_or_malformed_novela_scripts():
+    from app.core.errors import Conflict
+
+    async def scenario():
+        async with rig() as r:
+            await r.batch()
+            (content,) = await r.contents()
+            async with r.sf() as s:
+                (await s.get(Content, content.id)).status = "publicado"
+                await s.commit()
+            async with r.sf() as s:
+                with pytest.raises(Conflict):
+                    await ContentService(s).update_script(content.id, SCRIPT)
+                c = await s.get(Content, content.id)
+                c.status = "generado"
+                (await s.get(Project, c.project_id)).config = {"format": "novela"}
+                await s.commit()
+            async with r.sf() as s:
+                with pytest.raises(Conflict):  # texto corrido: no es un guion de novela
+                    await ContentService(s).update_script(content.id, SCRIPT)
+
+    run(scenario())

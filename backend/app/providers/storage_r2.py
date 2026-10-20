@@ -44,6 +44,12 @@ class R2Storage:
     async def delete(self, key: str) -> None:
         await self._call(self._s3.delete_object, Bucket=self._bucket, Key=key)
 
+    async def get_bytes(self, key: str) -> bytes:
+        try:
+            return await asyncio.to_thread(lambda: self._s3.get_object(Bucket=self._bucket, Key=key)["Body"].read())
+        except (BotoCoreError, ClientError) as e:
+            raise ProviderError(f"r2: {e}") from e
+
     @staticmethod
     async def _call(fn, *args, **kwargs) -> None:
         try:
