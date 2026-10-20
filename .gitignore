@@ -10,3 +10,5 @@ node_modules/
 .wrangler/
 *.egg-info/
 .dev.vars
+
+*.tsbuildinfo
