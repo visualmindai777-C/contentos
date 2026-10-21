@@ -45,12 +45,12 @@ function strawberry() {
   head.add(part(sphere(0.22), "#F0606F", { outline: 0, pos: [-0.42, 0.3, 0.55], scale: [0.9, 1.9, 0.35], rot: [0, 0, 0.35] }));
 
   // Capucha de hojas con borde festoneado
-  head.add(part(new THREE.SphereGeometry(0.82, 56, 28, 0, Math.PI * 2, 0, 1.3), "#2FA65A", { outline: 1.035, pos: [0, 0.22, 0] }));
-  for (const a of [-0.62, -0.2, 0.2, 0.62]) head.add(part(sphere(0.17), "#2FA65A", { pos: [Math.sin(a) * 0.76, 0.4, Math.cos(a) * 0.76], scale: [1, 0.8, 0.8] }));
-  head.add(part(new THREE.CylinderGeometry(0.085, 0.1, 0.24, 16), "#1E7A42", { pos: [0, 1.12, 0] }));
+  head.add(part(new THREE.SphereGeometry(0.82, 56, 28, 0, Math.PI * 2, 0, 1.12), "#2FA65A", { outline: 1.035, pos: [0, 0.3, 0] }));
+  for (const a of [-0.62, -0.2, 0.2, 0.62]) head.add(part(sphere(0.17), "#2FA65A", { pos: [Math.sin(a) * 0.7, 0.58, Math.cos(a) * 0.7], scale: [1, 0.8, 0.8] }));
+  head.add(part(new THREE.CylinderGeometry(0.085, 0.1, 0.24, 16), "#1E7A42", { pos: [0, 1.18, 0] }));
   head.add(part(sphere(0.2), "#58C985", { outline: 0, pos: [-0.3, 0.88, 0.5], scale: [1.7, 0.22, 0.5], rot: [0, 0, 0.55] }));
 
-  const face = makeFace(head, { z: 0.72, eyeX: 0.2, eyeY: 0.1, eyeR: 0.15, browY: 0.34, browW: 0.26, browColor: "#141418", tilt: [-0.3, 0.3], mouthY: -0.1, rest: "smile" });
+  const face = makeFace(head, { z: 0.72, eyeX: 0.2, eyeY: 0.1, eyeR: 0.15, browY: 0.3, browW: 0.26, browColor: "#141418", tilt: [-0.3, 0.3], mouthY: -0.1, rest: "smile" });
 
   // Laptop con candado neón
   const laptop = new THREE.Group();
@@ -230,7 +230,7 @@ function watermelon() {
   const hip = arm("#1E3A1E", [-0.92, -0.2, 0.2], [-0.2, -0.45, 0.35], [-0.25, 0, 0.0]);
   head.add(raised, hip);
   body.add(legs("#1E3A1E", "#C2416B", -0.88, 0.3, 0.24));
-  return finish(group, head, face, [{ group: raised, base: 0, side: 1 }, { group: hip, base: 0, side: -1 }], { focusY: 0.0, distance: 7.6 });
+  return finish(group, head, face, [{ group: raised, base: 0, side: 1 }, { group: hip, base: 0, side: -1 }], { focusY: 0.0, distance: 8.8 });
 }
 
 // ---------------------------------------------------------------- 6. Kiwi
@@ -247,8 +247,8 @@ function kiwi() {
     head.add(hair);
   }
   const cut = new THREE.Group();
-  cut.position.set(0, 0.44, 0.1);
-  cut.rotation.x = -0.5;
+  cut.position.set(0, 0.46, 0.12);
+  cut.rotation.x = 0.62;
   cut.add(part(new THREE.CylinderGeometry(0.43, 0.43, 0.05, 40), "#7BC043", { outline: 1.04 }));
   cut.add(part(sphere(0.12), "#E9F5C9", { outline: 0, pos: [0, 0.03, 0], scale: [1.6, 0.3, 1.0] }));
   for (let i = 0; i < 9; i++) {
