@@ -43,6 +43,7 @@ function fruitDecor(kind, group, color) {
       group.add(part(sphere(0.2), "#3f9b3c", { scale: [1.5, 0.35, 0.7], pos: [Math.cos(a) * 0.3, 0.74, Math.sin(a) * 0.3], rot: [0, -a, Math.cos(a) * 0.5], outline: 1.08 }));
     }
     group.add(part(new THREE.CylinderGeometry(0.04, 0.05, 0.22, 10), "#3f9b3c", { pos: [0, 0.86, 0] }));
+    group.add(part(sphere(0.42), color, { scale: [0.75, 1.05, 0.75], pos: [0, -0.62, 0] }));
     for (let i = 0; i < 18; i++) {
       const az = (i / 18) * Math.PI * 2, y = -0.05 - ((i * 7) % 5) * 0.15;
       const r = 0.7 * 0.93 * Math.sqrt(Math.max(0.05, 1 - (y / 0.77) ** 2));
@@ -53,7 +54,7 @@ function fruitDecor(kind, group, color) {
   }
   if (kind === "mango") {
     group.add(leaf(0.18, 0.84, 0, -0.5, 1.4));
-    group.add(part(sphere(0.2), "#e5532d", { scale: [1, 1.5, 0.5], pos: [-0.5, 0.25, 0.4], outline: 0 }));
+    group.add(part(sphere(0.16), "#ee6a2c", { scale: [1, 1.6, 0.35], pos: [-0.5, 0.32, 0.38], outline: 0 }));
   }
   if (kind === "lemon") {
     group.add(part(sphere(0.1), color, { pos: [0.62, 0.02, 0], scale: [1.2, 0.8, 0.8] }));
@@ -93,7 +94,7 @@ function buildFruit(spec) {
   // Brazos cortos con guantes blancos (dan gesto al personaje)
   for (const side of [-1, 1]) {
     const arm = new THREE.Group();
-    arm.position.set(0.82 * side * def.scale[0] * 0.95, -0.35, 0.1);
+    arm.position.set(0.78 * side * def.scale[0], -0.2, 0.1);
     arm.rotation.z = side * -0.5;
     arm.add(part(new THREE.CapsuleGeometry(0.07, 0.34, 6, 12), color, { pos: [0, -0.2, 0] }));
     arm.add(part(sphere(0.12), "#ffffff", { pos: [0, -0.46, 0] }));
@@ -128,7 +129,7 @@ function buildFruit(spec) {
   mouth.add(cavity, teeth);
   head.add(mouth);
 
-  root.userData = { body, head, eyes, brows, mouth, cavity, teeth, focusY: 0.1, distance: 4.9, baseBrow: true };
+  root.userData = { body, head, eyes, brows, mouth, cavity, teeth, focusY: -0.05, distance: 6.4, baseBrow: true };
   return root;
 }
 
