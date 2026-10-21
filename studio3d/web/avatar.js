@@ -24,7 +24,116 @@ function part(geometry, color, { outline = 1.04, ...place } = {}) {
 
 const sphere = (r = 1) => new THREE.SphereGeometry(r, 36, 24);
 
+const FRUITS = {
+  // color, forma (x, y, z), hoja/corona y cara: z de la superficie y altura de los ojos
+  strawberry: { color: "#e8344c", scale: [0.92, 1.1, 0.92], face: [0.66, 0.0] },
+  mango: { color: "#f7a823", scale: [0.9, 1.08, 0.84], face: [0.62, 0.0] },
+  lemon: { color: "#f6e13f", scale: [1.05, 0.84, 0.84], face: [0.56, 0.0] },
+  apple: { color: "#d83a3a", scale: [1.0, 0.92, 0.95], face: [0.64, 0.0] },
+  grape: { color: "#7b3fa8", scale: [0.95, 1.0, 0.95], face: [0.64, 0.0] },
+  banana: { color: "#f9dd4a", scale: [0.6, 1.35, 0.6], face: [0.4, 0.1] },
+  broccoli: { color: "#7bbf4a", scale: [0.62, 1.1, 0.62], face: [0.4, -0.15] },
+};
+
+function fruitDecor(kind, group, color) {
+  const leaf = (x, y, z, rot, size = 1) => part(sphere(0.2 * size), "#3f9b3c", { scale: [1.5, 0.35, 0.7], pos: [x, y, z], rot: [0, 0, rot], outline: 1.08 });
+  if (kind === "strawberry") {
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      group.add(part(sphere(0.2), "#3f9b3c", { scale: [1.5, 0.35, 0.7], pos: [Math.cos(a) * 0.3, 0.74, Math.sin(a) * 0.3], rot: [0, -a, Math.cos(a) * 0.5], outline: 1.08 }));
+    }
+    group.add(part(new THREE.CylinderGeometry(0.04, 0.05, 0.22, 10), "#3f9b3c", { pos: [0, 0.86, 0] }));
+    for (let i = 0; i < 18; i++) {
+      const az = (i / 18) * Math.PI * 2, y = -0.05 - ((i * 7) % 5) * 0.15;
+      const r = 0.7 * 0.93 * Math.sqrt(Math.max(0.05, 1 - (y / 0.77) ** 2));
+      const x = Math.sin(az) * r, z = Math.cos(az) * r;
+      if (z > 0.35 * r) continue; // el frente es la cara
+      group.add(part(sphere(0.028), "#ffe79a", { outline: 0, scale: [0.8, 1.3, 0.5], pos: [x * 1.02, y, z * 1.02] }));
+    }
+  }
+  if (kind === "mango") {
+    group.add(leaf(0.18, 0.84, 0, -0.5, 1.4));
+    group.add(part(sphere(0.2), "#e5532d", { scale: [1, 1.5, 0.5], pos: [-0.5, 0.25, 0.4], outline: 0 }));
+  }
+  if (kind === "lemon") {
+    group.add(part(sphere(0.1), color, { pos: [0.62, 0.02, 0], scale: [1.2, 0.8, 0.8] }));
+    group.add(part(sphere(0.1), color, { pos: [-0.62, 0.02, 0], scale: [1.2, 0.8, 0.8] }));
+    group.add(leaf(0.1, 0.62, 0, -0.4));
+  }
+  if (kind === "apple") {
+    group.add(part(new THREE.CylinderGeometry(0.035, 0.04, 0.2, 8), "#6b4423", { pos: [0, 0.66, 0], rot: [0, 0, 0.2] }));
+    group.add(leaf(0.18, 0.7, 0, -0.45));
+  }
+  if (kind === "grape") {
+    for (const [x, y, z] of [[-0.4, 0.5, -0.1], [0.4, 0.5, -0.1], [-0.55, 0.15, -0.3], [0.55, 0.15, -0.3], [0, 0.7, -0.15]])
+      group.add(part(sphere(0.3), "#8a4cbd", { pos: [x, y, z] }));
+    group.add(part(new THREE.CylinderGeometry(0.04, 0.05, 0.3, 8), "#6b8f3a", { pos: [0, 1.02, -0.1] }));
+  }
+  if (kind === "banana") {
+    group.add(part(new THREE.CylinderGeometry(0.09, 0.12, 0.2, 10), "#8a6a2a", { pos: [0, 0.88, 0] }));
+    group.add(part(sphere(0.12), "#5a3f1c", { pos: [0, -0.84, 0] }));
+  }
+  if (kind === "broccoli") {
+    for (const [x, y, z, r] of [[0, 0.8, 0, 0.5], [-0.4, 0.62, 0.05, 0.36], [0.4, 0.62, 0.05, 0.36], [-0.2, 0.95, -0.1, 0.32], [0.2, 0.95, 0.05, 0.32]])
+      group.add(part(sphere(r), "#2f8a3a", { pos: [x, y, z] }));
+  }
+}
+
+function buildFruit(spec) {
+  const def = FRUITS[spec.kind];
+  const root = new THREE.Group();
+  const body = new THREE.Group();
+  root.add(body);
+  const head = new THREE.Group();
+  body.add(head);
+  const color = spec.color ?? def.color;
+  head.add(part(sphere(0.7), color, { scale: def.scale }));
+  fruitDecor(spec.kind, head, color);
+
+  // Brazos cortos con guantes blancos (dan gesto al personaje)
+  for (const side of [-1, 1]) {
+    const arm = new THREE.Group();
+    arm.position.set(0.82 * side * def.scale[0] * 0.95, -0.35, 0.1);
+    arm.rotation.z = side * -0.5;
+    arm.add(part(new THREE.CapsuleGeometry(0.07, 0.34, 6, 12), color, { pos: [0, -0.2, 0] }));
+    arm.add(part(sphere(0.12), "#ffffff", { pos: [0, -0.46, 0] }));
+    head.add(arm);
+  }
+
+  const [faceZ, faceY] = def.face;
+  const eyes = [];
+  for (const side of [-1, 1]) {
+    const eye = new THREE.Group();
+    eye.position.set(0.22 * side, 0.16 + faceY, faceZ);
+    eye.add(part(sphere(0.15), "#ffffff", { scale: [1, 1.2, 0.55], outline: 1.1 }));
+    const pupil = part(sphere(0.085), "#1d1218", { outline: 0, pos: [0, 0, 0.07] });
+    eye.add(pupil);
+    eye.add(part(sphere(0.025), "#ffffff", { outline: 0, pos: [0.03, 0.035, 0.125] }));
+    head.add(eye);
+    eyes.push({ eye, pupil });
+  }
+  const brows = [];
+  for (const side of [-1, 1]) {
+    const brow = part(new THREE.BoxGeometry(0.22, 0.05, 0.05), "#3a2418", { outline: 1.15 });
+    brow.position.set(0.22 * side, 0.42 + faceY, faceZ + 0.02);
+    head.add(brow);
+    brows.push({ brow, side, base: 0.42 + faceY });
+  }
+  for (const side of [-1, 1]) head.add(part(sphere(0.08), "#ff8da1", { pos: [0.4 * side, -0.02 + faceY, faceZ - 0.04], scale: [1.2, 0.7, 0.3], outline: 0 }));
+  const mouth = new THREE.Group();
+  mouth.position.set(0, -0.22 + faceY, faceZ + 0.01);
+  mouth.userData.baseY = -0.22 + faceY;
+  const cavity = part(sphere(0.14), "#5a1620", { outline: 1.12, scale: [1, 0.2, 0.3] });
+  const teeth = part(new THREE.BoxGeometry(0.18, 0.035, 0.03), "#fbf7f0", { outline: 0, pos: [0, 0.035, 0.035] });
+  mouth.add(cavity, teeth);
+  head.add(mouth);
+
+  root.userData = { body, head, eyes, brows, mouth, cavity, teeth, focusY: 0.1, distance: 4.9, baseBrow: true };
+  return root;
+}
+
 export function buildCharacter(spec) {
+  if (spec.kind && FRUITS[spec.kind]) return buildFruit(spec);
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
@@ -61,7 +170,7 @@ export function buildCharacter(spec) {
     const brow = part(new THREE.BoxGeometry(0.24, 0.055, 0.05), spec.style === "bald" ? spec.skin : spec.hair, { outline: 1.15 });
     brow.position.set(0.24 * side, 0.2, 0.585);
     head.add(brow);
-    brows.push({ brow, side });
+    brows.push({ brow, side, base: 0.2 });
   }
 
   head.add(part(sphere(0.065), spec.skin, { pos: [0, -0.12, 0.645], scale: [1, 0.9, 0.9], outline: 1.15 }));
@@ -125,19 +234,20 @@ export function createStage({ width, height, characters }) {
     const wide = Math.max(0, Math.min(1, frame.wide ?? 0.5));
     cavity.scale.set(1 + (wide - 0.5) * 0.9, 0.2 + jaw * 1.35, 0.3 + jaw * 0.4);
     teeth.visible = jaw > 0.18;
-    mouth.position.y = -0.36 - jaw * 0.04;
+    mouth.position.y = (mouth.userData.baseY ?? -0.36) - jaw * 0.04;
     const open = 1 - Math.max(0, Math.min(1, frame.blink ?? 0));
     for (const { eye, pupil } of eyes) {
       eye.scale.y = 0.12 + 0.88 * open;
       pupil.position.x = (frame.lookX ?? 0) * 0.05;
     }
-    for (const { brow, side } of brows) {
-      brow.position.y = 0.2 + (frame.brow ?? 0) * 0.07;
+    for (const { brow, side, base } of brows) {
+      brow.position.y = base + (frame.brow ?? 0) * 0.07;
       brow.rotation.z = side * -((frame.brow ?? 0) * 0.18);
     }
-    const distance = 6.2 / (frame.zoom ?? 1);
-    camera.position.set(0, -0.35, distance);
-    camera.lookAt(0, -0.5, 0);
+    const focus = obj.userData.focusY ?? -0.5;
+    const distance = (obj.userData.distance ?? 6.2) / (frame.zoom ?? 1);
+    camera.position.set(0, focus + 0.15, distance);
+    camera.lookAt(0, focus, 0);
     renderer.render(scene, camera);
   }
 

@@ -1,0 +1,59 @@
+{
+  "fps": 24,
+  "audio": "dialogue.wav",
+  "characters": {
+    "MARIA": {
+      "kind": "strawberry"
+    },
+    "ALEJANDRO": {
+      "kind": "mango"
+    },
+    "ROSA": {
+      "kind": "lemon"
+    }
+  },
+  "lines": [
+    {
+      "speaker": "ROSA",
+      "start": 0.0,
+      "end": 3.3
+    },
+    {
+      "speaker": "MARIA",
+      "start": 3.575,
+      "end": 6.6
+    },
+    {
+      "speaker": "NARRADOR",
+      "start": 6.9,
+      "end": 10.55,
+      "shows": "MARIA"
+    },
+    {
+      "speaker": "ROSA",
+      "start": 10.85,
+      "end": 14.25
+    },
+    {
+      "speaker": "ALEJANDRO",
+      "start": 14.55,
+      "end": 17.6
+    },
+    {
+      "speaker": "MARIA",
+      "start": 17.9,
+      "end": 21.28
+    },
+    {
+      "speaker": "ALEJANDRO",
+      "start": 21.575,
+      "end": 24.68
+    },
+    {
+      "speaker": "NARRADOR",
+      "start": 24.975,
+      "end": 28.3,
+      "shows": "ALEJANDRO"
+    }
+  ]
+}
