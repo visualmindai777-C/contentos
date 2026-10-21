@@ -89,6 +89,7 @@ class VideoSpec:
     width: int = 1080
     height: int = 1920
     fps: int = 30
+    clips: list[Path | None] | None = None  # clip ya animado por escena (paralaje); None = usar la imagen con zoom
     watermark: Path | None = None  # ícono de marca (PNG con transparencia), arriba a la derecha, fuera de la zona de la interfaz
     outro: Path | None = None  # tarjeta final 9:16 de la marca
     outro_seconds: float = 2.0

@@ -57,7 +57,11 @@ class FFmpegVideo:
 
         # Recorte previo de la franja inferior; trunc(.../2)*2 mantiene una altura par para el códec
         trim = f"crop=iw:trunc(ih*{1 - spec.crop_bottom:.4f}/2)*2:0:0," if spec.crop_bottom > 0 else ""
+        animated = [bool(spec.clips and spec.clips[i]) for i in range(n)]
         clips = [
+            # Escena con clip de paralaje: ya viene compuesta en 1080x1920; solo se ajusta a la duración de la escena
+            f"[{i}:v]fps={spec.fps},trim=end_frame={frames_per[i]},setpts=PTS-STARTPTS,format=yuv420p,setsar=1[v{i}]"
+            if animated[i] else
             f"[{i}:v]{trim}format=yuv420p,split[bg{i}][fg{i}];"
             f"[bg{i}]scale={w // 6}:{h // 6}:force_original_aspect_ratio=increase,crop={w // 6}:{h // 6},"
             f"boxblur=4:2,scale={w}:{h},eq=brightness=-0.1,"
@@ -71,8 +75,8 @@ class FFmpegVideo:
         joined = "".join(f"[v{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=0[cat]"
         tail = [f"[cat]subtitles={srt.name}:force_style='{SUBTITLE_STYLE}'[body0]"]
         cmd = ["ffmpeg", "-y", "-loglevel", "error"]
-        for image in spec.images:
-            cmd += ["-i", str(image.resolve())]
+        for i, image in enumerate(spec.images):
+            cmd += ["-i", str((spec.clips[i] if animated[i] else image).resolve())]
         cmd += ["-i", str(audio)]
         nxt, body = n + 1, "body0"
         if spec.watermark:

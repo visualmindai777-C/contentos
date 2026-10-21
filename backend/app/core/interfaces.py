@@ -55,6 +55,13 @@ class TTSProvider(Protocol):
 
 
 @runtime_checkable
+class MotionProvider(Protocol):
+    async def animate(self, image: Path, output: Path, *, seconds: float, index: int) -> Path:
+        """Convierte una imagen fija en un clip 9:16 sin audio con movimiento de cámara con profundidad."""
+        ...
+
+
+@runtime_checkable
 class VideoProvider(Protocol):
     async def render(self, spec: VideoSpec) -> RenderedVideo:
         """Monta imágenes + audio + subtítulos en spec.output (vertical por defecto)."""
@@ -105,3 +112,4 @@ class Providers:
     video: VideoProvider
     storage: ObjectStorage
     trends: Sequence[TrendSource]
+    motion: MotionProvider | None = None  # opcional: paralaje 3D a partir de la imagen

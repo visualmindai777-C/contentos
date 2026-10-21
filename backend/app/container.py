@@ -13,6 +13,7 @@ from app.core.interfaces import (
 from app.core.settings import Settings, get_settings
 from app.providers.image_pollinations import PollinationsProvider
 from app.providers.llm_openrouter import OpenRouterClient
+from app.providers.motion_parallax import ParallaxMotion
 from app.providers.storage_r2 import R2Storage
 from app.providers.trends.google import GoogleTrendsSource
 from app.providers.trends.reddit import RedditSource
@@ -32,7 +33,9 @@ def build_agents(providers: Providers, session_factory: async_sessionmaker[Async
     return Agents(
         trend=TrendAgent(providers.trends),
         content=ContentAgent(providers.llm),
-        media=MediaAgent(providers.tts, providers.images, providers.video, voice=s.tts_voice, lang=s.tts_lang),
+        media=MediaAgent(
+            providers.tts, providers.images, providers.video, voice=s.tts_voice, lang=s.tts_lang, motion=providers.motion,
+        ),
         storage=StorageAgent(session_factory, providers.storage),
     )
 
@@ -50,6 +53,7 @@ def build_providers(settings: Settings | None = None) -> Providers:
         video=FFmpegVideo(),
         storage=R2Storage(s.r2_account_id, s.r2_access_key_id, s.r2_secret_access_key, s.r2_bucket),
         trends=[GoogleTrendsSource(), RedditSource(), WikipediaSource()],
+        motion=ParallaxMotion(),
     )
     # Falla al arrancar, no a mitad del pipeline, si una implementación deja de cumplir su contrato.
     checks = [

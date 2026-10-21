@@ -1,0 +1,37 @@
+# Prueba de paralaje 3D con Depth Anything V2 Small (Apache-2.0) en un runner estándar: mide tiempos y guarda el video.
+name: parallax-spike
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  spike:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Paquetes del sistema
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/huggingface
+          key: hf-depth-anything-v2-small
+      - name: Dependencias
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install transformers opencv-python-headless pillow numpy
+      - name: Paralaje de 3 escenas
+        working-directory: backend
+        run: python scripts/parallax_spike.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: parallax-spike
+          path: backend/spike_out/

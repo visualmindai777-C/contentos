@@ -43,7 +43,7 @@ jobs:
         run: psql "postgresql://postgres:postgres@localhost:5432/contentos" -v ON_ERROR_STOP=1 -q -f db/schema.sql
       - name: Dependencias
         working-directory: backend
-        run: pip install -e ".[dev]" langgraph
+        run: pip install -e ".[dev]" langgraph opencv-python-headless numpy pillow
       - name: Pruebas
         working-directory: backend
         run: python -m pytest -q

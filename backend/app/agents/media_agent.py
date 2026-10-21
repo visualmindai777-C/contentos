@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path
 
 from app.core.audio import join_wavs
-from app.core.interfaces import ImageProvider, ProviderError, RateLimitError, TTSProvider, VideoProvider
+from app.core.interfaces import ImageProvider, MotionProvider, ProviderError, RateLimitError, TTSProvider, VideoProvider
 from app.core.screenplay import NARRATOR, Screenplay, parse_screenplay
 from app.core.subtitles import chunk_segments, to_srt
 from app.core.types import ContentDraft, GeneratedImage, MediaBundle, Narration, ProjectContext, Segment, VideoSpec
@@ -52,12 +52,13 @@ class MediaAgent:
 
     def __init__(
         self, tts: TTSProvider, images: ImageProvider, video: VideoProvider, *, voice: str, lang: str,
-        retries: int = 3, sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        retries: int = 3, sleep: Callable[[float], Awaitable[None]] = asyncio.sleep, motion: MotionProvider | None = None,
     ):
         self._tts, self._images, self._video = tts, images, video
         self._voice, self._lang = voice, lang
         self._retries = retries
         self._sleep = sleep
+        self._motion = motion
 
     async def run(
         self, project: ProjectContext, topic: str, draft: ContentDraft, workdir: Path, *, existing_images: Sequence[bytes] | None = None,
@@ -82,6 +83,7 @@ class MediaAgent:
         video = await self._video.render(VideoSpec(
             images=paths, audio=audio, segments=narration.segments, output=workdir / "video.mp4",
             crop_bottom=float(cfg.get("image_crop_bottom", DEFAULT_CROP_BOTTOM)), **self._brand(cfg),
+            clips=await self._clips(cfg, paths, [narration.duration / len(paths)] * len(paths), workdir),
         ))
         return MediaBundle(video=video, images=paths, subtitles=to_srt(chunk_segments(narration.segments)))
 
@@ -107,6 +109,7 @@ class MediaAgent:
         video = await self._video.render(VideoSpec(
             images=paths, audio=audio, segments=narration.segments, output=workdir / "video.mp4",
             durations=durations, crop_bottom=float(cfg.get("image_crop_bottom", DEFAULT_CROP_BOTTOM)), **self._brand(cfg),
+            clips=await self._clips(cfg, paths, durations, workdir),
         ))
         return MediaBundle(video=video, images=paths, subtitles=to_srt(chunk_segments(narration.segments)))
 
@@ -158,6 +161,19 @@ class MediaAgent:
             path.write_bytes(image.data)
             paths.append(path)
         return paths
+
+    async def _clips(self, cfg: dict, paths: list[Path], durations: list[float], workdir: Path) -> list[Path | None] | None:
+        """Paralaje 3D por escena si el proyecto lo pide (`"motion": "parallax"`). Si falla, esa escena sigue con zoom."""
+        if cfg.get("motion") != "parallax" or self._motion is None:
+            return None
+        clips: list[Path | None] = []
+        for i, (path, seconds) in enumerate(zip(paths, durations)):
+            try:  # un poco más largo que la escena: FFmpeg recorta al instante exacto
+                clips.append(await self._motion.animate(path, workdir / f"clip_{i}.mp4", seconds=seconds + 0.4, index=i))
+            except ProviderError as e:
+                logger.warning("motion failed", extra={"fields": {"scene": i, "error": str(e)[:200]}})
+                clips.append(None)
+        return clips if any(clips) else None
 
     @staticmethod
     def _brand(cfg: dict) -> dict:

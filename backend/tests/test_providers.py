@@ -479,3 +479,70 @@ def test_media_agent_reuses_existing_images_and_only_generates_the_missing_ones(
         project, "tema", draft, tmp_path, existing_images=[b"\xff\xd8vieja"]))
     assert len(prompts) == 1 and "bearded" in prompts[0]  # solo la escena 2 se pidió de nuevo
     assert specs[0].images[0].read_bytes() == b"\xff\xd8vieja" and specs[0].images[1].read_bytes() == b"\xff\xd8nueva"
+
+
+# --- Paralaje 3D (código abierto, sin servicios) ---
+def _ffprobe_seconds(path):
+    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
+                         capture_output=True, text=True, check=True).stdout
+    return float(out)
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="ffmpeg no instalado")
+def test_parallax_clip_has_the_scene_duration_and_feeds_the_final_render(tmp_path):
+    pytest.importorskip("cv2")
+    import numpy as np
+
+    from app.providers.motion_parallax import render_parallax
+
+    sample = Path(__file__).parent / "assets" / "sample_a.jpg"
+    depth = np.tile(np.linspace(0, 1, 64, dtype=np.float32), (64, 1))  # profundidad sintética: sin descargar el modelo
+    clip = tmp_path / "clip.mp4"
+    render_parallax(sample, depth, clip, seconds=1.0, index=0, fps=10, width=270, height=480)
+    assert _ffprobe_seconds(clip) == pytest.approx(1.0, abs=0.2)
+
+    audio = tmp_path / "a.wav"
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=2", str(audio)], check=True)
+    big = tmp_path / "clip_big.mp4"
+    render_parallax(sample, depth, big, seconds=2.4, index=1, fps=30)  # tamaño real 1080x1920
+    video = run(FFmpegVideo().render(VideoSpec(
+        [sample, sample], audio, [Segment("hola", 0, 2)], tmp_path / "o" / "v.mp4", durations=[1.0, 1.0], clips=[big, None],
+    )))
+    assert video.duration == pytest.approx(2.0, abs=0.3)
+
+
+def test_media_agent_uses_parallax_clips_and_falls_back_to_zoom_when_a_scene_fails(tmp_path):
+    from app.agents.media_agent import MediaAgent
+    from app.core.types import ContentDraft, GeneratedImage, Narration, RenderedVideo
+
+    specs, asked = [], []
+
+    class TTS:
+        async def synthesize(self, text, *, voice, lang):
+            return Narration(_wav(1.0), "audio/wav", 1.0, [Segment(text, 0.0, 1.0)])
+
+    class Images:
+        async def generate(self, prompt, *, width, height, seed):
+            return GeneratedImage(b"\xff\xd8jpg", "image/jpeg")
+
+    class Video:
+        async def render(self, spec):
+            specs.append(spec)
+            return RenderedVideo(spec.output, 5.0, 1)
+
+    class Motion:
+        async def animate(self, image, output, *, seconds, index):
+            asked.append((index, round(seconds, 1)))
+            if index == 1:
+                raise ProviderError("sin memoria")
+            return output
+
+    draft = ContentDraft("T", "h", NOVELA, "c", ["#a"], "cta")
+    agent = MediaAgent(TTS(), Images(), Video(), voice="ef_dora", lang="e", motion=Motion())
+    off = ProjectContext(uuid.uuid4(), "N", "general", "es", {"format": "novela"})
+    run(agent.run(off, "tema", draft, tmp_path))
+    assert asked == [] and specs[-1].clips is None  # sin "motion": solo zoom
+
+    on = ProjectContext(uuid.uuid4(), "N", "general", "es", {"format": "novela", "motion": "parallax"})
+    run(agent.run(on, "tema", draft, tmp_path))
+    assert [i for i, _ in asked] == [0, 1] and specs[-1].clips[0] is not None and specs[-1].clips[1] is None
