@@ -31,7 +31,8 @@ export function buildCharacter(spec) {
   const female = spec.gender === "f";
 
   // Torso, cuello y cabeza
-  body.add(part(sphere(1), spec.clothes, { pos: [0, -1.55, 0], scale: [female ? 0.82 : 0.98, 0.78, 0.6] }));
+  body.add(part(sphere(1), spec.clothes, { pos: [0, -1.62, 0], scale: [female ? 0.74 : 0.9, 0.62, 0.5] }));
+  body.add(part(new THREE.CylinderGeometry(female ? 0.42 : 0.5, female ? 0.62 : 0.74, 0.8, 28), spec.clothes, { pos: [0, -1.3, 0], scale: [1, 1, 0.62], outline: 1.03 }));
   if (spec.tie) body.add(part(new THREE.BoxGeometry(0.1, 0.62, 0.05), "#8b1c2b", { outline: 1.1, pos: [0, -1.18, 0.55] }));
   if (spec.tie) body.add(part(new THREE.BoxGeometry(0.36, 0.2, 0.06), "#f1efe8", { outline: 1.08, pos: [0, -0.88, 0.5] }));
   body.add(part(new THREE.CylinderGeometry(0.2, 0.24, 0.4, 20), spec.skin, { pos: [0, -0.7, 0] }));
@@ -45,11 +46,11 @@ export function buildCharacter(spec) {
   const eyes = [];
   for (const side of [-1, 1]) {
     const eye = new THREE.Group();
-    eye.position.set(0.23 * side, 0.1, 0.55);
-    eye.add(part(sphere(0.14), "#ffffff", { scale: [1, 1.18, 0.55], outline: 1.1 }));
-    const pupil = part(sphere(0.075), "#1d1218", { outline: 0, pos: [0, 0, 0.07] });
+    eye.position.set(0.24 * side, 0.02, 0.56);
+    eye.add(part(sphere(0.105), "#ffffff", { scale: [1, 1.2, 0.55], outline: 1.1 }));
+    const pupil = part(sphere(0.058), "#1d1218", { outline: 0, pos: [0, 0, 0.05] });
     eye.add(pupil);
-    eye.add(part(sphere(0.022), "#ffffff", { outline: 0, pos: [0.025, 0.03, 0.12] }));
+    eye.add(part(sphere(0.018), "#ffffff", { outline: 0, pos: [0.02, 0.025, 0.085] }));
     head.add(eye);
     eyes.push({ eye, pupil });
   }
@@ -58,16 +59,17 @@ export function buildCharacter(spec) {
   const brows = [];
   for (const side of [-1, 1]) {
     const brow = part(new THREE.BoxGeometry(0.24, 0.055, 0.05), spec.style === "bald" ? spec.skin : spec.hair, { outline: 1.15 });
-    brow.position.set(0.23 * side, 0.34, 0.56);
+    brow.position.set(0.24 * side, 0.2, 0.585);
     head.add(brow);
     brows.push({ brow, side });
   }
 
-  head.add(part(sphere(0.07), spec.skin, { pos: [0, -0.04, 0.64], scale: [1, 0.9, 0.9], outline: 1.15 }));
+  head.add(part(sphere(0.065), spec.skin, { pos: [0, -0.12, 0.645], scale: [1, 0.9, 0.9], outline: 1.15 }));
+  for (const side of [-1, 1]) head.add(part(sphere(0.07), "#e08a7a", { pos: [0.34 * side, -0.14, 0.52], scale: [1.2, 0.7, 0.3], outline: 0 }));
 
   // Boca: abertura (jaw) y anchura (wide)
   const mouth = new THREE.Group();
-  mouth.position.set(0, -0.3, 0.57);
+  mouth.position.set(0, -0.36, 0.575);
   const cavity = part(sphere(0.13), "#5a1620", { outline: 1.12, scale: [1, 0.2, 0.3] });
   const teeth = part(new THREE.BoxGeometry(0.17, 0.035, 0.03), "#fbf7f0", { outline: 0, pos: [0, 0.035, 0.035] });
   mouth.add(cavity, teeth);
@@ -76,16 +78,16 @@ export function buildCharacter(spec) {
 
   // Pelo
   const hair = spec.hair;
-  const cap = (extra = 0) => new THREE.SphereGeometry(0.67 + extra, 40, 24, 0, Math.PI * 2, 0, Math.PI * 0.5);
+  const cap = (extra = 0) => new THREE.SphereGeometry(0.67 + extra, 40, 24, 0, Math.PI * 2, 0, Math.PI * 0.37);
   if (spec.style !== "bald") {
-    head.add(part(cap(), hair, { scale: [1.02, 1.1, 1.0], pos: [0, 0.04, -0.04], rot: [-0.18, 0, 0] }));
+    head.add(part(cap(), hair, { scale: [1.03, 1.12, 1.02], pos: [0, 0.05, -0.05], rot: [-0.3, 0, 0] }));
   }
   if (spec.style === "long") {
-    head.add(part(sphere(0.7), hair, { scale: [0.95, 1.35, 0.55], pos: [0, -0.5, -0.32] }));
-    for (const side of [-1, 1]) head.add(part(sphere(0.2), hair, { scale: [0.7, 2.2, 0.8], pos: [0.62 * side, -0.35, 0.0] }));
+    head.add(part(sphere(0.7), hair, { scale: [0.95, 1.3, 0.5], pos: [0, -0.42, -0.34] }));
+    for (const side of [-1, 1]) head.add(part(sphere(0.2), hair, { scale: [0.6, 2.4, 0.9], pos: [0.62 * side, -0.32, -0.02] }));
   }
   if (spec.style === "bun") head.add(part(sphere(0.22), hair, { pos: [0, 0.78, -0.3] }));
-  if (spec.style === "slick") head.add(part(cap(0.01), "#b9b9c2", { scale: [1.02, 1.1, 1.0], pos: [0.02, 0.07, -0.02], rot: [-0.42, 0, 0], outline: 0 }));
+  if (spec.style === "slick") head.add(part(cap(0.012), "#b9b9c2", { scale: [1.03, 1.12, 1.02], pos: [0.03, 0.07, -0.04], rot: [-0.5, 0, 0], outline: 0 }));
 
   root.userData = { body, head, eyes, brows, mouth, cavity, teeth };
   return root;
@@ -123,19 +125,19 @@ export function createStage({ width, height, characters }) {
     const wide = Math.max(0, Math.min(1, frame.wide ?? 0.5));
     cavity.scale.set(1 + (wide - 0.5) * 0.9, 0.2 + jaw * 1.35, 0.3 + jaw * 0.4);
     teeth.visible = jaw > 0.18;
-    mouth.position.y = -0.3 - jaw * 0.04;
+    mouth.position.y = -0.36 - jaw * 0.04;
     const open = 1 - Math.max(0, Math.min(1, frame.blink ?? 0));
     for (const { eye, pupil } of eyes) {
       eye.scale.y = 0.12 + 0.88 * open;
       pupil.position.x = (frame.lookX ?? 0) * 0.05;
     }
     for (const { brow, side } of brows) {
-      brow.position.y = 0.34 + (frame.brow ?? 0) * 0.07;
+      brow.position.y = 0.2 + (frame.brow ?? 0) * 0.07;
       brow.rotation.z = side * -((frame.brow ?? 0) * 0.18);
     }
     const distance = 6.2 / (frame.zoom ?? 1);
     camera.position.set(0, -0.35, distance);
-    camera.lookAt(0, -0.55, 0);
+    camera.lookAt(0, -0.5, 0);
     renderer.render(scene, camera);
   }
 
