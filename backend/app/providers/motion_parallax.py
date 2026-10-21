@@ -10,14 +10,14 @@ from app.core.interfaces import ProviderError
 
 MODEL = "depth-anything/Depth-Anything-V2-Small-hf"
 FG_RATIO = 4 / 3  # la imagen es 3:4; el resto del 9:16 es su propio fondo desenfocado (igual que el video con zoom)
-MARGIN = 1.16  # la imagen se amplía para tener margen de movimiento sin ver los bordes
+MARGIN = 1.20  # la imagen se amplía para tener margen de movimiento sin ver los bordes
 
 # (paneo x, paneo y, paralaje, zoom inicial, zoom final): un movimiento distinto por escena
 PATHS = (
-    (-0.020, 0.0, 26.0, 1.00, 1.07),
-    (0.020, 0.0, -26.0, 1.07, 1.00),
-    (0.0, -0.016, 22.0, 1.00, 1.06),
-    (0.014, 0.012, -22.0, 1.05, 1.00),
+    (-0.020, 0.0, 46.0, 1.00, 1.08),
+    (0.020, 0.0, -46.0, 1.08, 1.00),
+    (0.0, -0.016, 40.0, 1.00, 1.07),
+    (0.014, 0.012, -40.0, 1.06, 1.00),
 )
 
 
