@@ -18,8 +18,11 @@ class Settings(BaseSettings):
 
     # Pipeline (providers). El portal solo muestra modelos y voz.
     openrouter_api_key: str = ""
+    # Los modelos gratuitos cambian a diario: orden según la prueba de scripts/check_models.py (workflow models-check)
     openrouter_models: str = (
-        "google/gemma-4-31b-it:free,google/gemma-4-26b-a4b-it:free,nvidia/nemotron-3-super-120b-a12b:free,openrouter/free"
+        "minimax/minimax-m3.1-flash:free,nvidia/nemotron-3-ultra-550b-a55b:free,openrouter/free,poolside/laguna-s-2.1:free,"
+        "nvidia/nemotron-3.5-lightning:free,google/gemma-4-31b-it:free,google/gemma-4-26b-a4b-it:free,"
+        "dots-studio/dots-3-note-preview:free"
     )
     pollinations_token: str = ""  # opcional: el acceso anónimo funciona
     tts_voice: str = "ef_dora"
