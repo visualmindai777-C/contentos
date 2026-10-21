@@ -1,0 +1,13 @@
+{
+  "name": "contentos-studio3d",
+  "private": true,
+  "type": "module",
+  "description": "Personajes 3D que hablan: three.js renderizado sin pantalla (Chromium + WebGL por software). Todo código abierto.",
+  "scripts": {
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0",
+    "three": "^0.170.0"
+  }
+}

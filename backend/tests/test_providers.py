@@ -546,3 +546,18 @@ def test_media_agent_uses_parallax_clips_and_falls_back_to_zoom_when_a_scene_fai
     on = ProjectContext(uuid.uuid4(), "N", "general", "es", {"format": "novela", "motion": "parallax"})
     run(agent.run(on, "tema", draft, tmp_path))
     assert [i for i, _ in asked] == [0, 1] and specs[-1].clips[0] is not None and specs[-1].clips[1] is None
+
+
+# --- Sincronía de la boca (3D) ---
+def test_mouth_curves_close_in_silence_and_open_with_voice_energy():
+    np = pytest.importorskip("numpy")
+    from app.core.lipsync import mouth_curves
+
+    rate, fps = 24_000, 24
+    t = np.arange(rate) / rate
+    tone = (0.4 * np.sin(2 * np.pi * 220 * t)).astype(np.float32)  # 1 s de "voz"
+    samples = np.concatenate([np.zeros(rate, dtype=np.float32), tone, np.zeros(rate, dtype=np.float32)])
+    jaw, wide = mouth_curves(samples, rate, fps)
+    assert len(jaw) == 72
+    assert jaw[:20].max() < 0.05 and jaw[30:44].min() > 0.4 and jaw[-15:].max() < 0.3  # cierra en silencio, abre con voz
+    assert 0 <= wide.min() and wide.max() <= 1

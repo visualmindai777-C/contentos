@@ -1,0 +1,47 @@
+# Prueba de personajes 3D que hablan (three.js + Chromium sin pantalla) en un runner estándar: mide tiempos y guarda el video.
+name: avatar-spike
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  spike:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Paquetes del sistema
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Dependencias
+        working-directory: studio3d
+        run: |
+          pip install numpy
+          npm install
+          npx playwright install --with-deps chromium
+      - name: Línea de tiempo (boca sincronizada con el audio)
+        working-directory: studio3d
+        run: python make_timeline.py samples/dialogue.json timeline.json
+      - name: Fotogramas de los personajes
+        working-directory: studio3d
+        run: node render.mjs timeline.json frames 720 1280
+      - name: Composición con fondo y audio
+        working-directory: studio3d
+        run: |
+          mkdir -p out
+          ffmpeg -y -loglevel error -loop 1 -i ../backend/tests/assets/sample_b.jpg -framerate 24 -i frames/f_%05d.png -i samples/dialogue.wav \
+            -filter_complex "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=24:6,eq=brightness=-0.2,setsar=1[bg];[1:v]scale=1080:1920,format=rgba[av];[bg][av]overlay=0:0:shortest=1,fps=24,format=yuv420p[v]" \
+            -map "[v]" -map 2:a -c:v libx264 -preset veryfast -crf 20 -c:a aac -shortest out/avatar.mp4
+          cp frames/f_00060.png out/muestra_a.png; cp frames/f_00400.png out/muestra_b.png; cp frames/f_00560.png out/muestra_c.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: avatar-spike
+          path: studio3d/out/

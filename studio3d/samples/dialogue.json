@@ -1,0 +1,19 @@
+{
+  "fps": 24,
+  "audio": "dialogue.wav",
+  "characters": {
+    "MARIA":     {"skin": "#c98f6b", "hair": "#2a1a14", "style": "long",  "clothes": "#d9c7a8", "gender": "f"},
+    "ALEJANDRO": {"skin": "#b9805f", "hair": "#8d8d93", "style": "slick", "clothes": "#1c1c24", "gender": "m", "tie": true},
+    "ROSA":      {"skin": "#c58a68", "hair": "#a5a5a5", "style": "bun",   "clothes": "#7a5a3c", "gender": "f"}
+  },
+  "lines": [
+    {"speaker": "ROSA",      "start": 0.00,  "end": 3.30},
+    {"speaker": "MARIA",     "start": 3.575, "end": 6.60},
+    {"speaker": "NARRADOR",  "start": 6.90,  "end": 10.55, "shows": "MARIA"},
+    {"speaker": "ROSA",      "start": 10.85, "end": 14.25},
+    {"speaker": "ALEJANDRO", "start": 14.55, "end": 17.60},
+    {"speaker": "MARIA",     "start": 17.90, "end": 21.28},
+    {"speaker": "ALEJANDRO", "start": 21.575,"end": 24.68},
+    {"speaker": "NARRADOR",  "start": 24.975,"end": 28.30, "shows": "ALEJANDRO"}
+  ]
+}

@@ -15,3 +15,7 @@ node_modules/
 
 # Kit de marca original (los recursos usados se copian a frontend/public y backend/app/assets/brand)
 visualmindai777-marca*
+studio3d/node_modules/
+studio3d/frames/
+studio3d/out/
+studio3d/timeline.json
