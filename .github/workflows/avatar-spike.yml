@@ -6,7 +6,10 @@ on:
     inputs:
       sample:
         description: "Línea de tiempo de muestra"
-        default: "samples/dialogue.json"
+        default: "samples/frutinovela.json"
+      mode:
+        description: "sheet = hoja de personajes; video = diálogo completo"
+        default: "sheet"
 
 permissions:
   contents: read
@@ -31,20 +34,28 @@ jobs:
           pip install numpy
           npm install
           npx playwright install --with-deps chromium
+      - name: Hoja de personajes
+        if: inputs.mode == 'sheet'
+        working-directory: studio3d
+        run: |
+          python make_sheet.py timeline.json
+          node render.mjs timeline.json frames 720 1280
+          mkdir -p out
+          ffmpeg -y -loglevel error -framerate 1 -i frames/f_%05d.png -f lavfi -i color=c=0x1d2530:s=720x1280:r=1             -filter_complex "[1:v][0:v]overlay=shortest=1,scale=300:-1,tile=6x2:padding=6:color=0x0e1116" -frames:v 1 out/hoja.png
       - name: Línea de tiempo (boca sincronizada con el audio)
+        if: inputs.mode == 'video'
         working-directory: studio3d
         run: python make_timeline.py ${{ inputs.sample }} timeline.json
       - name: Fotogramas de los personajes
+        if: inputs.mode == 'video'
         working-directory: studio3d
         run: node render.mjs timeline.json frames 720 1280
       - name: Composición con fondo y audio
+        if: inputs.mode == 'video'
         working-directory: studio3d
         run: |
           mkdir -p out
-          ffmpeg -y -loglevel error -loop 1 -i ../backend/tests/assets/sample_b.jpg -framerate 24 -i frames/f_%05d.png -i samples/dialogue.wav \
-            -filter_complex "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=24:6,eq=brightness=-0.2,setsar=1[bg];[1:v]scale=1080:1920,format=rgba[av];[bg][av]overlay=0:0:shortest=1,fps=24,format=yuv420p[v]" \
-            -map "[v]" -map 2:a -c:v libx264 -preset veryfast -crf 20 -c:a aac -shortest out/avatar.mp4
-          cp frames/f_00060.png out/muestra_a.png; cp frames/f_00400.png out/muestra_b.png; cp frames/f_00560.png out/muestra_c.png
+          ffmpeg -y -loglevel error -loop 1 -i ../backend/tests/assets/sample_b.jpg -framerate 24 -i frames/f_%05d.png -i samples/dialogue.wav             -filter_complex "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=24:6,eq=brightness=-0.2,setsar=1[bg];[1:v]scale=1080:1920,format=rgba[av];[bg][av]overlay=0:0:shortest=1,fps=24,format=yuv420p[v]"             -map "[v]" -map 2:a -c:v libx264 -preset veryfast -crf 20 -c:a aac -shortest out/avatar.mp4
       - uses: actions/upload-artifact@v4
         with:
           name: avatar-spike

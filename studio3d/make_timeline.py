@@ -47,6 +47,7 @@ for f in range(frames_total):
         "roll": round(math.sin(time * 0.7) * 0.02, 4),
         "bob": round(math.sin(time * 2.1) * 0.012, 4),
         "lookX": round(math.sin(time * 0.5), 3),
+        "gesture": round(j * math.sin(time * 5.0), 3),
         "zoom": round(1.0 + 0.07 * progress, 4),
     })
 

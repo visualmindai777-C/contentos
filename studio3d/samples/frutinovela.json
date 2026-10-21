@@ -3,13 +3,13 @@
   "audio": "dialogue.wav",
   "characters": {
     "MARIA": {
-      "kind": "strawberry"
+      "kind": "fresa"
     },
     "ALEJANDRO": {
-      "kind": "mango"
+      "kind": "pina"
     },
     "ROSA": {
-      "kind": "lemon"
+      "kind": "sandia"
     }
   },
   "lines": [
